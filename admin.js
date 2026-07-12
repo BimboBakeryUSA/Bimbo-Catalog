@@ -12,7 +12,7 @@ const TITULO_BASE = 'Panel de pedidos — Catálogo Bimbo';
 async function mostrarSegunSesion() {
   const { data } = await supabaseClient.auth.getSession();
   if (data.session) {
-    mostrarPanel();
+    await intentarMostrarPanel();
   } else {
     mostrarLogin();
   }
@@ -23,11 +23,34 @@ function mostrarLogin() {
   document.getElementById('ordersView').classList.add('hidden');
 }
 
+async function intentarMostrarPanel() {
+  const {
+    data: { user },
+  } = await supabaseClient.auth.getUser();
+  const { data: perfil } = await supabaseClient
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (perfil?.role !== 'admin') {
+    await supabaseClient.auth.signOut();
+    const errorEl = document.getElementById('loginError');
+    errorEl.textContent = 'Esta cuenta no tiene permisos de admin.';
+    errorEl.classList.remove('hidden');
+    mostrarLogin();
+    return;
+  }
+  mostrarPanel();
+}
+
 function mostrarPanel() {
   document.getElementById('loginView').classList.add('hidden');
   document.getElementById('ordersView').classList.remove('hidden');
   cargarPedidos();
+  cargarUsuarios();
   suscribirseATiempoReal();
+  suscribirseAUsuarios();
   initProfileMenu({ linkCatalogo: true, onLogout: cerrarSesion });
 }
 
@@ -55,7 +78,7 @@ async function iniciarSesion() {
     return;
   }
   errorEl.classList.add('hidden');
-  mostrarPanel();
+  await intentarMostrarPanel();
 }
 
 async function cerrarSesion() {
@@ -197,6 +220,132 @@ function notificarPedidoNuevo() {
 }
 
 // ============================================================
+// USUARIOS (clientes registrados + admins)
+// ============================================================
+let usuarios = [];
+let filtroUsuarios = 'todos';
+
+async function cargarUsuarios() {
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .order('estado_cuenta', { ascending: true })
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error cargando usuarios:', error);
+    return;
+  }
+  usuarios = data || [];
+  renderUsuarios();
+  actualizarBadgePendientes();
+}
+
+function actualizarBadgePendientes() {
+  const pendientes = usuarios.filter((u) => u.estado_cuenta === 'pendiente').length;
+  const badge = document.getElementById('pendientesBadge');
+  badge.textContent = pendientes;
+  badge.classList.toggle('hidden', pendientes === 0);
+}
+
+function renderUsuarios() {
+  const wrap = document.getElementById('usuariosWrap');
+  const filtrados =
+    filtroUsuarios === 'todos' ? usuarios : usuarios.filter((u) => u.estado_cuenta === filtroUsuarios);
+
+  if (filtrados.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">No hay usuarios en esta vista.</p>';
+    return;
+  }
+
+  wrap.innerHTML = filtrados.map((u) => tarjetaUsuario(u)).join('');
+
+  wrap.querySelectorAll('[data-aprobar]').forEach((btn) => {
+    btn.addEventListener('click', () => cambiarEstadoCuenta(btn.dataset.aprobar, 'aprobado'));
+  });
+  wrap.querySelectorAll('[data-rechazar]').forEach((btn) => {
+    btn.addEventListener('click', () => cambiarEstadoCuenta(btn.dataset.rechazar, 'rechazado'));
+  });
+  wrap.querySelectorAll('[data-hacer-admin]').forEach((btn) => {
+    btn.addEventListener('click', () => hacerAdmin(btn.dataset.hacerAdmin));
+  });
+}
+
+function tarjetaUsuario(u) {
+  const fecha = new Date(u.created_at).toLocaleDateString('es-MX', { dateStyle: 'medium' });
+  const acciones = [];
+
+  if (u.role !== 'admin') {
+    if (u.estado_cuenta === 'pendiente') {
+      acciones.push(`<button data-aprobar="${u.id}">Aprobar</button>`);
+      acciones.push(`<button data-rechazar="${u.id}">Rechazar</button>`);
+    }
+    if (u.estado_cuenta === 'rechazado') {
+      acciones.push(`<button data-aprobar="${u.id}">Aprobar</button>`);
+    }
+    if (u.estado_cuenta === 'aprobado') {
+      acciones.push(`<button data-rechazar="${u.id}">Rechazar</button>`);
+      acciones.push(`<button data-hacer-admin="${u.id}">Hacer admin</button>`);
+    }
+  }
+
+  return `
+    <div class="order-card ${u.estado_cuenta === 'pendiente' ? 'is-nuevo' : ''}">
+      <div class="order-head">
+        <div>
+          <div class="order-cliente">${u.tienda_nombre || u.nombre || u.email}</div>
+          <div class="order-meta">${u.nombre || ''}${u.telefono ? ' · ' + u.telefono : ''}</div>
+          <div class="order-meta">${u.email || ''}</div>
+          <div class="order-meta">${u.direccion || ''}${u.ciudad ? ', ' + u.ciudad : ''}${u.estado ? ', ' + u.estado : ''} ${u.zip || ''}</div>
+          <div class="order-meta">Registrado: ${fecha}</div>
+          <span class="order-badge ${u.role === 'admin' ? 'admin' : u.estado_cuenta}">${u.role === 'admin' ? 'admin' : u.estado_cuenta}</span>
+        </div>
+      </div>
+      <div class="order-actions">${acciones.join('')}</div>
+    </div>
+  `;
+}
+
+async function cambiarEstadoCuenta(id, estado_cuenta) {
+  const { error } = await supabaseClient.from('profiles').update({ estado_cuenta }).eq('id', id);
+  if (error) {
+    console.error('Error actualizando usuario:', error);
+    return;
+  }
+  const u = usuarios.find((x) => x.id === id);
+  if (u) u.estado_cuenta = estado_cuenta;
+  renderUsuarios();
+  actualizarBadgePendientes();
+}
+
+async function hacerAdmin(id) {
+  if (!confirm('¿Seguro que quieres dar permisos de admin a este usuario?')) return;
+  const { error } = await supabaseClient.from('profiles').update({ role: 'admin' }).eq('id', id);
+  if (error) {
+    console.error('Error promoviendo a admin:', error);
+    return;
+  }
+  const u = usuarios.find((x) => x.id === id);
+  if (u) u.role = 'admin';
+  renderUsuarios();
+}
+
+function suscribirseAUsuarios() {
+  supabaseClient
+    .channel('perfiles-cambios')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+      cargarUsuarios();
+    })
+    .subscribe();
+}
+
+function cambiarPanelAdmin(panel) {
+  document.querySelectorAll('.admin-tabs .auth-tab').forEach((btn) => btn.classList.toggle('active', btn.dataset.panel === panel));
+  document.getElementById('panelPedidos').classList.toggle('hidden', panel !== 'pedidos');
+  document.getElementById('panelUsuarios').classList.toggle('hidden', panel !== 'usuarios');
+}
+
+// ============================================================
 // INICIALIZACIÓN
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -212,6 +361,19 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('#ordersFilter .chip').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       renderPedidos();
+    });
+  });
+
+  document.querySelectorAll('.admin-tabs .auth-tab').forEach((btn) => {
+    btn.addEventListener('click', () => cambiarPanelAdmin(btn.dataset.panel));
+  });
+
+  document.getElementById('usuariosFilter').querySelectorAll('.chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      filtroUsuarios = btn.dataset.filtro;
+      document.querySelectorAll('#usuariosFilter .chip').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderUsuarios();
     });
   });
 

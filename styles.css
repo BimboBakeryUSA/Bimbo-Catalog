@@ -582,6 +582,40 @@ select.form-field {
   margin: 6px 0 20px;
 }
 
+.auth-card { max-width: 400px; }
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 4px;
+  margin: 14px 0 18px;
+}
+.auth-tab {
+  flex: 1;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  padding: 9px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.auth-tab.active { background: #fff; color: var(--ink); box-shadow: var(--shadow-sm); }
+
+.admin-tabs {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 4px;
+  margin-bottom: 20px;
+}
+.admin-tabs .auth-tab { flex: none; padding: 9px 16px; }
+
 .orders-toolbar {
   display: flex;
   align-items: center;
@@ -633,9 +667,13 @@ select.form-field {
   border-radius: 999px;
   margin-top: 6px;
 }
-.order-badge.nuevo { background: rgba(227,6,19,0.1); color: var(--bimbo-red); }
+.order-badge.nuevo,
+.order-badge.pendiente { background: rgba(227,6,19,0.1); color: var(--bimbo-red); }
 .order-badge.visto { background: rgba(20,22,58,0.08); color: var(--ink); }
-.order-badge.completado { background: rgba(16,163,74,0.1); color: #0F8A3D; }
+.order-badge.completado,
+.order-badge.aprobado { background: rgba(16,163,74,0.1); color: #0F8A3D; }
+.order-badge.rechazado { background: rgba(20,22,58,0.08); color: var(--ink-soft); }
+.order-badge.admin { background: rgba(20,22,58,0.08); color: var(--bimbo-navy); }
 
 .order-items {
   border-top: 1px solid var(--line);

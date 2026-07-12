@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v5 — dirección completa + menú de perfil';
+const VERSION = 'v7 — aprobación de cuentas por el admin';
 
 const ESTADOS_SERVICIO = [
   { valor: 'MD', nombre: 'Maryland' },
@@ -12,6 +12,150 @@ const ESTADOS_SERVICIO = [
 ];
 
 // CONFIG y supabaseClient vienen de config.js (compartido con admin.js)
+
+// ============================================================
+// AUTENTICACIÓN — el catálogo requiere cuenta (cliente o admin)
+// ============================================================
+let perfilActual = null;
+let usuarioActual = null;
+
+async function mostrarSegunSesion() {
+  const { data } = await supabaseClient.auth.getSession();
+  if (data.session) {
+    await cargarPerfilYEntrar();
+  } else {
+    document.getElementById('authView').classList.remove('hidden');
+    document.getElementById('appShell').classList.add('hidden');
+  }
+}
+
+async function cargarPerfilYEntrar() {
+  const {
+    data: { user },
+  } = await supabaseClient.auth.getUser();
+  usuarioActual = user;
+  const { data: perfil } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+  perfilActual = perfil;
+  mostrarApp();
+}
+
+function mostrarApp() {
+  document.getElementById('authView').classList.add('hidden');
+
+  const esAdmin = perfilActual?.role === 'admin';
+  if (!esAdmin && perfilActual?.estado_cuenta !== 'aprobado') {
+    mostrarPendiente();
+    return;
+  }
+
+  document.getElementById('appShell').classList.remove('hidden');
+  renderChips();
+  renderCatalogo();
+  actualizarBadge();
+  initProfileMenu({
+    linkPedidos: esAdmin,
+    linkMisPedidos: !esAdmin,
+    onLogout: async () => {
+      await supabaseClient.auth.signOut();
+      location.reload();
+    },
+  });
+}
+
+function mostrarPendiente() {
+  document.getElementById('pendienteView').classList.remove('hidden');
+  const msg = document.getElementById('pendienteMensaje');
+  if (perfilActual?.estado_cuenta === 'rechazado') {
+    msg.textContent = 'Tu cuenta fue rechazada. Contacta al administrador si crees que es un error.';
+  } else {
+    msg.textContent = 'Tu cuenta está pendiente de aprobación. Te avisaremos cuando puedas entrar a hacer pedidos.';
+  }
+}
+
+async function iniciarSesion() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errorEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+
+  if (!email || !password) {
+    errorEl.textContent = 'Completa correo y contraseña.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  btn.disabled = false;
+  btn.textContent = 'Entrar';
+
+  if (error) {
+    errorEl.textContent = 'Correo o contraseña incorrectos.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  errorEl.classList.add('hidden');
+  await cargarPerfilYEntrar();
+}
+
+async function registrarse() {
+  const tienda = document.getElementById('regTienda').value.trim();
+  const nombre = document.getElementById('regNombre').value.trim();
+  const telefono = document.getElementById('regTelefono').value.trim();
+  const direccion = document.getElementById('regDireccion').value.trim();
+  const ciudad = document.getElementById('regCiudad').value.trim();
+  const estado = document.getElementById('regEstado').value.trim();
+  const zip = document.getElementById('regZip').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const errorEl = document.getElementById('registroError');
+  const okEl = document.getElementById('registroOk');
+  const btn = document.getElementById('registroBtn');
+
+  okEl.classList.add('hidden');
+  if (!tienda || !nombre || !telefono || !direccion || !ciudad || !estado || !zip || !email || !password) {
+    errorEl.textContent = 'Completa todos los campos para crear tu cuenta.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Creando...';
+  const { data, error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { tienda_nombre: tienda, nombre, telefono, direccion, ciudad, estado, zip },
+    },
+  });
+  btn.disabled = false;
+  btn.textContent = 'Crear cuenta';
+
+  if (error) {
+    errorEl.textContent = error.message || 'No se pudo crear la cuenta.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  errorEl.classList.add('hidden');
+
+  if (data.session) {
+    await cargarPerfilYEntrar();
+  } else {
+    okEl.textContent = 'Cuenta creada. Si tu correo requiere confirmación, revisa tu bandeja antes de entrar.';
+    okEl.classList.remove('hidden');
+  }
+}
+
+function cambiarTabAuth(tab) {
+  document.querySelectorAll('.auth-tab').forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === tab));
+  document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('registroForm').classList.toggle('hidden', tab !== 'registro');
+}
 
 // ============================================================
 // DATOS DE PRODUCTOS (de ejemplo — luego se puede conectar a Supabase)
@@ -258,17 +402,17 @@ function renderCartModal() {
     ${filas}
     <div class="cart-total"><span>Total</span><strong>$${totalCarrito().toFixed(2)}</strong></div>
     <div id="checkoutFormWrap">
-      <input class="form-field" id="inputTienda" placeholder="Nombre de la tienda" />
-      <input class="form-field" id="inputNombre" placeholder="Nombre de quien solicita" />
-      <input class="form-field" id="inputTelefono" placeholder="Teléfono" />
-      <input class="form-field" id="inputDireccion" placeholder="Dirección" />
+      <input class="form-field" id="inputTienda" placeholder="Nombre de la tienda" value="${perfilActual?.tienda_nombre || ''}" />
+      <input class="form-field" id="inputNombre" placeholder="Nombre de quien solicita" value="${perfilActual?.nombre || ''}" />
+      <input class="form-field" id="inputTelefono" placeholder="Teléfono" value="${perfilActual?.telefono || ''}" />
+      <input class="form-field" id="inputDireccion" placeholder="Dirección" value="${perfilActual?.direccion || ''}" />
       <div class="form-row">
-        <input class="form-field" id="inputCiudad" placeholder="Ciudad" />
+        <input class="form-field" id="inputCiudad" placeholder="Ciudad" value="${perfilActual?.ciudad || ''}" />
         <select class="form-field" id="inputEstado">
           <option value="">Estado</option>
-          ${ESTADOS_SERVICIO.map((e) => `<option value="${e.valor}">${e.valor} — ${e.nombre}</option>`).join('')}
+          ${ESTADOS_SERVICIO.map((e) => `<option value="${e.valor}" ${perfilActual?.estado === e.valor ? 'selected' : ''}>${e.valor} — ${e.nombre}</option>`).join('')}
         </select>
-        <input class="form-field" id="inputZip" placeholder="ZIP" inputmode="numeric" maxlength="5" />
+        <input class="form-field" id="inputZip" placeholder="ZIP" inputmode="numeric" maxlength="5" value="${perfilActual?.zip || ''}" />
       </div>
       <textarea class="form-field" id="inputNotas" placeholder="Notas (opcional)" rows="2"></textarea>
       <p id="checkoutError" class="error-text hidden">Completa todos los campos (nombre, teléfono, tienda, dirección, ciudad, estado y ZIP).</p>
@@ -342,6 +486,7 @@ async function enviarPedido() {
   if (supabaseClient) {
     try {
       await supabaseClient.from('pedidos').insert({
+        user_id: usuarioActual?.id,
         cliente_nombre: nombre,
         cliente_telefono: telefono,
         cliente_direccion: direccion,
@@ -425,17 +570,25 @@ function cerrarModal(id) {
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   alert(`Catálogo Bimbo — ${VERSION}`);
-  renderChips();
-  renderCatalogo();
-  actualizarBadge();
 
-  initProfileMenu({
-    linkPedidos: true,
-    onLogout: async () => {
-      await supabaseClient.auth.signOut();
-      location.reload();
-    },
+  // Opciones de Estado en el formulario de registro
+  document.getElementById('regEstado').innerHTML +=
+    ESTADOS_SERVICIO.map((e) => `<option value="${e.valor}">${e.valor} — ${e.nombre}</option>`).join('');
+
+  document.querySelectorAll('.auth-tab').forEach((btn) => {
+    btn.addEventListener('click', () => cambiarTabAuth(btn.dataset.tab));
   });
+  document.getElementById('loginBtn').addEventListener('click', iniciarSesion);
+  document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') iniciarSesion();
+  });
+  document.getElementById('registroBtn').addEventListener('click', registrarse);
+  document.getElementById('pendienteLogoutBtn').addEventListener('click', async () => {
+    await supabaseClient.auth.signOut();
+    location.reload();
+  });
+
+  mostrarSegunSesion();
 
   document.getElementById('searchInput').addEventListener('input', (e) => {
     textoBusqueda = e.target.value;

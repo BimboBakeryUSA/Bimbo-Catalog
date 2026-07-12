@@ -2,7 +2,7 @@
 // Solo se muestra si hay una sesión de Supabase activa (admin logueado).
 // Requiere que config.js ya haya corrido (supabaseClient disponible).
 
-async function initProfileMenu({ linkPedidos = false, linkCatalogo = false, onLogout } = {}) {
+async function initProfileMenu({ linkPedidos = false, linkCatalogo = false, linkMisPedidos = false, onLogout } = {}) {
   const wrap = document.getElementById('profileWrap');
   if (!wrap || !supabaseClient) return;
 
@@ -22,6 +22,9 @@ async function initProfileMenu({ linkPedidos = false, linkCatalogo = false, onLo
 
   const linkCatalogoEl = document.getElementById('profileLinkCatalogo');
   if (linkCatalogoEl) linkCatalogoEl.classList.toggle('hidden', !linkCatalogo);
+
+  const linkMisPedidosEl = document.getElementById('profileLinkMisPedidos');
+  if (linkMisPedidosEl) linkMisPedidosEl.classList.toggle('hidden', !linkMisPedidos);
 
   const btn = document.getElementById('profileBtn');
   const dropdown = document.getElementById('profileDropdown');

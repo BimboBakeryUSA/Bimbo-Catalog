@@ -7,72 +7,124 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=5" />
+<link rel="stylesheet" href="styles.css?v=7" />
 </head>
 <body>
 
-  <header class="topbar">
-    <div class="topbar-inner">
-      <span class="brand">Catálogo <strong>Bimbo</strong></span>
-      <div class="topbar-actions">
-        <button id="cartBtn" class="cart-btn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
-          <span>Mi pedido</span>
-          <span id="cartBadge" class="cart-badge hidden">0</span>
-        </button>
-        <div id="profileWrap" class="profile-wrap hidden">
-          <button id="profileBtn" class="profile-btn" aria-label="Perfil">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          </button>
-          <div id="profileDropdown" class="profile-dropdown hidden">
-            <div class="profile-email" id="profileEmail"></div>
-            <a href="admin.html" id="profileLinkPedidos">Ver pedidos</a>
-            <button id="profileLogoutBtn" class="danger">Cerrar sesión</button>
-          </div>
+  <!-- Login / Registro (el catálogo requiere cuenta) -->
+  <div id="authView" class="admin-login-screen">
+    <div class="login-card auth-card">
+      <span class="hero-eyebrow">Catálogo Bimbo</span>
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Iniciar sesión</button>
+        <button class="auth-tab" data-tab="registro">Crear cuenta</button>
+      </div>
+
+      <div id="loginForm" class="auth-form">
+        <input class="form-field" id="loginEmail" type="email" placeholder="Correo" autocomplete="username" />
+        <input class="form-field" id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password" />
+        <p id="loginError" class="error-text hidden"></p>
+        <button class="btn-primary" id="loginBtn">Entrar</button>
+      </div>
+
+      <div id="registroForm" class="auth-form hidden">
+        <input class="form-field" id="regTienda" placeholder="Nombre de la tienda" />
+        <input class="form-field" id="regNombre" placeholder="Nombre de quien solicita" />
+        <input class="form-field" id="regTelefono" placeholder="Teléfono" />
+        <input class="form-field" id="regDireccion" placeholder="Dirección" />
+        <div class="form-row">
+          <input class="form-field" id="regCiudad" placeholder="Ciudad" />
+          <select class="form-field" id="regEstado">
+            <option value="">Estado</option>
+          </select>
+          <input class="form-field" id="regZip" placeholder="ZIP" inputmode="numeric" maxlength="5" />
         </div>
+        <input class="form-field" id="regEmail" type="email" placeholder="Correo" autocomplete="username" />
+        <input class="form-field" id="regPassword" type="password" placeholder="Contraseña" autocomplete="new-password" />
+        <p id="registroError" class="error-text hidden"></p>
+        <p id="registroOk" class="hint-text hidden"></p>
+        <button class="btn-primary" id="registroBtn">Crear cuenta</button>
       </div>
-    </div>
-  </header>
-
-  <main id="catalogView" class="view">
-    <section class="hero">
-      <span class="hero-eyebrow">Recién horneado, todos los días</span>
-      <h1>Tu pedido Bimbo,<br />a un clic de distancia</h1>
-    </section>
-
-    <div class="toolbar">
-      <div class="search-row">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input id="searchInput" type="text" placeholder="Buscar producto..." />
-      </div>
-      <div id="chipsWrap" class="chips-wrap"></div>
-    </div>
-
-    <div id="categoriesWrap"></div>
-  </main>
-
-  <!-- Modal: detalle de producto -->
-  <div id="productModal" class="modal hidden">
-    <div class="modal-card">
-      <button class="modal-close" data-close="productModal">✕</button>
-      <div id="productModalBody"></div>
     </div>
   </div>
 
-  <!-- Modal: carrito / checkout -->
-  <div id="cartModal" class="modal hidden">
-    <div class="modal-card">
-      <button class="modal-close" data-close="cartModal">✕</button>
-      <div id="cartModalBody"></div>
+  <!-- Cuenta pendiente / rechazada -->
+  <div id="pendienteView" class="admin-login-screen hidden">
+    <div class="login-card">
+      <span class="hero-eyebrow">Catálogo Bimbo</span>
+      <h1 class="login-title">Un momento...</h1>
+      <p id="pendienteMensaje" class="hint-text" style="margin-top:0;"></p>
+      <button class="btn-secondary" id="pendienteLogoutBtn">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <!-- App (catálogo) — visible solo con sesión iniciada y aprobada -->
+  <div id="appShell" class="hidden">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="brand">Catálogo <strong>Bimbo</strong></span>
+        <div class="topbar-actions">
+          <button id="cartBtn" class="cart-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+            <span>Mi pedido</span>
+            <span id="cartBadge" class="cart-badge hidden">0</span>
+          </button>
+          <div id="profileWrap" class="profile-wrap hidden">
+            <button id="profileBtn" class="profile-btn" aria-label="Perfil">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            </button>
+            <div id="profileDropdown" class="profile-dropdown hidden">
+              <div class="profile-email" id="profileEmail"></div>
+              <a href="admin.html" id="profileLinkPedidos">Ver pedidos</a>
+              <a href="mis-pedidos.html" id="profileLinkMisPedidos">Mis pedidos</a>
+              <a href="index.html" id="profileLinkCatalogo">Catálogo</a>
+              <button id="profileLogoutBtn" class="danger">Cerrar sesión</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="catalogView" class="view">
+      <section class="hero">
+        <span class="hero-eyebrow">Recién horneado, todos los días</span>
+        <h1>Tu pedido Bimbo,<br />a un clic de distancia</h1>
+      </section>
+
+      <div class="toolbar">
+        <div class="search-row">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="searchInput" type="text" placeholder="Buscar producto..." />
+        </div>
+        <div id="chipsWrap" class="chips-wrap"></div>
+      </div>
+
+      <div id="categoriesWrap"></div>
+    </main>
+
+    <!-- Modal: detalle de producto -->
+    <div id="productModal" class="modal hidden">
+      <div class="modal-card">
+        <button class="modal-close" data-close="productModal">✕</button>
+        <div id="productModalBody"></div>
+      </div>
+    </div>
+
+    <!-- Modal: carrito / checkout -->
+    <div id="cartModal" class="modal hidden">
+      <div class="modal-card">
+        <button class="modal-close" data-close="cartModal">✕</button>
+        <div id="cartModalBody"></div>
+      </div>
     </div>
   </div>
 
   <!-- EmailJS (envío de correo sin backend) -->
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-  <!-- Supabase (guarda cada pedido para que el admin lo vea) -->
+  <!-- Supabase (login, catálogo gated, guarda cada pedido) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=5"></script>
-  <script src="profile-menu.js?v=5"></script>
-  <script src="app.js?v=5"></script>
+  <script src="config.js?v=7"></script>
+  <script src="profile-menu.js?v=7"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>

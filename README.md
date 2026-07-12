@@ -4,21 +4,42 @@ Catálogo web público de productos Bimbo. App estática (sin build, sin npm):
 `index.html` (catálogo) + `admin.html` (panel de pedidos) + `config.js` +
 `app.js` + `admin.js` + `styles.css`.
 
-El cliente navega productos, arma un pedido y llena: nombre de la tienda,
-nombre de quien solicita, teléfono, dirección, ciudad, estado (MD/DC/VA/DE)
-y ZIP — todos obligatorios. El pedido queda completo en cuanto se guarda en
-**Supabase** (y se manda copia por correo si configuraste EmailJS) —
-compartirlo por WhatsApp es un botón opcional en la pantalla de
-confirmación, no bloquea nada. Tú, como admin, lo ves en `admin.html` con
-notificación en tiempo real (sonido + aviso en pantalla + título de la
-pestaña) apenas entra.
+El catálogo ahora requiere cuenta. Un cliente nuevo se registra una vez
+con: nombre de la tienda, nombre de quien solicita, teléfono, dirección,
+ciudad, estado (MD/DC/VA/DE) y ZIP, más correo/contraseña. Esos datos
+quedan guardados en su perfil y el formulario de pedido llega **prellenado**
+cada vez (sigue siendo editable por si un pedido puntual cambia algo). El
+pedido queda completo en cuanto se guarda en **Supabase** (y se manda copia
+por correo si configuraste EmailJS) — compartirlo por WhatsApp es un botón
+opcional en la confirmación, no bloquea nada.
 
-`admin.html` ya no tiene link visible desde el catálogo público — entra
-directo a esa URL cuando la necesites. Una vez que inicias sesión ahí,
-aparece un ícono de perfil arriba a la derecha (también en el catálogo, si
-navegas de vuelta con la sesión activa) con un menú para alternar entre
-**Catálogo** y **Ver pedidos**, y cerrar sesión. Si no hay sesión iniciada
-(un cliente normal), ese ícono no aparece en ningún lado.
+Cuando alguien se registra, su cuenta queda **pendiente de aprobación** —
+ve una pantalla de "un momento..." y no puede usar el catálogo hasta que tú
+la apruebes. En `admin.html` hay una pestaña **Usuarios** (con contador de
+pendientes) donde puedes Aprobar, Rechazar, o **Hacer admin** a cualquier
+cliente aprobado. Esa lista también se actualiza sola si abres/cierras
+cuentas desde otro lado.
+
+Cada cliente puede ver su propio historial en **Mis pedidos**
+(`mis-pedidos.html`), con el estado actualizándose en vivo cuando el admin
+lo marca como visto/completado. Tú, como admin, ves todos los pedidos en
+`admin.html` con notificación en tiempo real (sonido + aviso en pantalla +
+título de la pestaña).
+
+El ícono de perfil (arriba a la derecha) aparece para cualquier cuenta con
+sesión iniciada — admin ve "Ver pedidos", clientes ven "Mis pedidos", y
+ambos pueden volver al "Catálogo" o cerrar sesión desde ahí. Si alguien sin
+permisos de admin intenta entrar a `admin.html`, se le rechaza con un
+mensaje y se cierra su sesión ahí.
+
+### Nota sobre confirmación de correo
+
+Por default, Supabase pide confirmar el correo antes de poder iniciar
+sesión (le manda un correo automático al cliente con un link). Si prefieres
+que el registro sea instantáneo (sin ese paso), entra al dashboard de
+Supabase → proyecto **catalogo-bimbo** → **Authentication → Providers →
+Email** y desactiva "Confirm email". Esto no lo puedo cambiar yo desde aquí
+(es un ajuste del dashboard, no de la base de datos).
 
 ## 1. Proyecto de Supabase
 
@@ -72,12 +93,14 @@ Netlify, etc. No requiere build ni servidor.
 ## 5. Estructura
 
 ```
-index.html      ← catálogo público
-admin.html      ← panel de pedidos (requiere login)
+index.html      ← catálogo (requiere cuenta: login/registro incluidos)
+admin.html      ← panel de pedidos del admin (requiere login)
+mis-pedidos.html← historial de pedidos del cliente logueado
 config.js       ← configuración compartida (WhatsApp, EmailJS, Supabase)
 profile-menu.js ← menú de perfil arriba a la derecha (compartido)
-app.js          ← lógica del catálogo/carrito/checkout
-admin.js        ← login, lista de pedidos, notificación en tiempo real
+app.js          ← catálogo, auth de cliente, carrito/checkout prellenado
+admin.js        ← login admin, lista de pedidos, notificación en tiempo real
+mis-pedidos.js  ← historial de pedidos propio (solo lectura)
 styles.css      ← estilos (colores de marca Bimbo)
 ```
 
