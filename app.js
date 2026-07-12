@@ -1,6 +1,7 @@
 // ============================================================
 // CONFIGURACIÓN — edita estos valores con los tuyos.
 // ============================================================
+
 const CONFIG = {
   // Número de WhatsApp donde llegarán los pedidos (formato internacional,
   // solo dígitos, sin espacios ni signos). Ej: 5215512345678
