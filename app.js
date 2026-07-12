@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v3 — pedidos guardados + notificación admin';
+const VERSION = 'v4 — tienda/dirección obligatorios, WhatsApp opcional';
 
 // CONFIG y supabaseClient vienen de config.js (compartido con admin.js)
 
@@ -253,11 +253,12 @@ function renderCartModal() {
     <div id="checkoutFormWrap">
       <input class="form-field" id="inputNombre" placeholder="Nombre completo" />
       <input class="form-field" id="inputTelefono" placeholder="Teléfono" />
-      <input class="form-field" id="inputDireccion" placeholder="Dirección (opcional)" />
+      <input class="form-field" id="inputDireccion" placeholder="Dirección" />
+      <input class="form-field" id="inputTienda" placeholder="Nombre de la tienda" />
       <textarea class="form-field" id="inputNotas" placeholder="Notas (opcional)" rows="2"></textarea>
-      <p id="checkoutError" class="error-text hidden">Completa al menos nombre y teléfono.</p>
+      <p id="checkoutError" class="error-text hidden">Completa nombre, teléfono, dirección y nombre de la tienda.</p>
       <button class="btn-primary" id="enviarPedidoBtn">Enviar pedido</button>
-      <p class="hint-text">Se enviará por correo y se abrirá WhatsApp con tu pedido listo.</p>
+      <p class="hint-text">Tu pedido queda registrado de una vez. Compartirlo por WhatsApp es opcional.</p>
     </div>
   `;
 
@@ -287,7 +288,8 @@ function construirMensajePedido(cliente) {
     '',
     `Cliente: ${cliente.nombre}`,
     `Teléfono: ${cliente.telefono}`,
-    cliente.direccion ? `Dirección: ${cliente.direccion}` : null,
+    `Dirección: ${cliente.direccion}`,
+    `Tienda: ${cliente.tienda}`,
     cliente.notas ? `Notas: ${cliente.notas}` : null,
     '',
     ...carrito.map((i) => `• ${i.nombre} x${i.cantidad} - $${(i.precio * i.cantidad).toFixed(2)}`),
@@ -301,11 +303,12 @@ async function enviarPedido() {
   const nombre = document.getElementById('inputNombre').value.trim();
   const telefono = document.getElementById('inputTelefono').value.trim();
   const direccion = document.getElementById('inputDireccion').value.trim();
+  const tienda = document.getElementById('inputTienda').value.trim();
   const notas = document.getElementById('inputNotas').value.trim();
   const errorEl = document.getElementById('checkoutError');
   const btn = document.getElementById('enviarPedidoBtn');
 
-  if (!nombre || !telefono) {
+  if (!nombre || !telefono || !direccion || !tienda) {
     errorEl.classList.remove('hidden');
     return;
   }
@@ -313,27 +316,29 @@ async function enviarPedido() {
   btn.disabled = true;
   btn.textContent = 'Enviando...';
 
-  const cliente = { nombre, telefono, direccion, notas };
+  const cliente = { nombre, telefono, direccion, tienda, notas };
   const mensaje = construirMensajePedido(cliente);
 
-  // 0) Guardar el pedido en Supabase (para que el admin lo vea y reciba
-  // notificación en tiempo real desde admin.html)
+  // 1) Guardar el pedido en Supabase — esto es lo que hace que el
+  // pedido quede "completo" (el admin lo ve y recibe notificación).
   if (supabaseClient) {
     try {
       await supabaseClient.from('pedidos').insert({
         cliente_nombre: nombre,
         cliente_telefono: telefono,
-        cliente_direccion: direccion || null,
+        cliente_direccion: direccion,
+        tienda_nombre: tienda,
         cliente_notas: notas || null,
         items: carrito,
         total: totalCarrito(),
       });
     } catch (err) {
       console.error('Error guardando pedido en Supabase:', err);
-      // seguimos: igual mandamos correo/WhatsApp aunque falle el guardado
     }
   }
 
+  // 2) Correo al admin (si está configurado EmailJS). Tampoco es
+  // requisito para completar el pedido.
   if (CONFIG.EMAILJS_PUBLIC_KEY && CONFIG.EMAILJS_SERVICE_ID && CONFIG.EMAILJS_TEMPLATE_ID) {
     try {
       emailjs.init(CONFIG.EMAILJS_PUBLIC_KEY);
@@ -341,7 +346,8 @@ async function enviarPedido() {
         to_email: CONFIG.ORDER_EMAIL_TO,
         cliente_nombre: nombre,
         cliente_telefono: telefono,
-        cliente_direccion: direccion || '-',
+        cliente_direccion: direccion,
+        tienda_nombre: tienda,
         cliente_notas: notas || '-',
         pedido_detalle: mensaje,
         pedido_total: totalCarrito().toFixed(2),
@@ -351,25 +357,35 @@ async function enviarPedido() {
     }
   }
 
-  if (CONFIG.WHATSAPP_NUMBER) {
-    const url = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(mensaje)}`;
-    window.open(url, '_blank');
-  }
-
+  // WhatsApp NO se abre solo — el pedido ya quedó completo arriba.
+  // Queda como botón opcional en la confirmación por si el cliente
+  // quiere compartirlo con alguien más.
   vaciarCarrito();
-  mostrarConfirmacion();
+  mostrarConfirmacion(mensaje);
 }
 
-function mostrarConfirmacion() {
+function mostrarConfirmacion(mensaje) {
   const body = document.getElementById('cartModalBody');
+  const botonWhatsapp = CONFIG.WHATSAPP_NUMBER
+    ? `<button class="btn-secondary" id="compartirWhatsappBtn">Compartir por WhatsApp (opcional)</button>`
+    : '';
+
   body.innerHTML = `
     <div class="confirm-state">
       <div class="confirm-icon">✓</div>
-      <h3>¡Gracias! Tu pedido fue enviado.</h3>
+      <h3>¡Gracias! Tu pedido quedó registrado.</h3>
       <p>Nos pondremos en contacto contigo pronto.</p>
+      ${botonWhatsapp}
       <button class="btn-primary" data-close="cartModal">Seguir viendo el catálogo</button>
     </div>
   `;
+
+  if (CONFIG.WHATSAPP_NUMBER) {
+    document.getElementById('compartirWhatsappBtn').addEventListener('click', () => {
+      const url = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(mensaje)}`;
+      window.open(url, '_blank');
+    });
+  }
   body.querySelector('[data-close]').addEventListener('click', () => cerrarModal('cartModal'));
 }
 

@@ -4,10 +4,16 @@ Catálogo web público de productos Bimbo. App estática (sin build, sin npm):
 `index.html` (catálogo) + `admin.html` (panel de pedidos) + `config.js` +
 `app.js` + `admin.js` + `styles.css`.
 
-El cliente navega productos, arma un pedido y lo envía por **WhatsApp**,
-**correo** (EmailJS) y queda guardado en **Supabase** para que tú, como
-admin, lo veas en `admin.html` con notificación en tiempo real (sonido +
-aviso en pantalla + título de la pestaña) apenas entra.
+El cliente navega productos, arma un pedido y llena nombre, teléfono,
+dirección y nombre de la tienda (todos obligatorios). El pedido queda
+completo en cuanto se guarda en **Supabase** (y se manda copia por correo
+si configuraste EmailJS) — compartirlo por WhatsApp es un botón opcional
+en la pantalla de confirmación, no bloquea nada. Tú, como admin, lo ves en
+`admin.html` con notificación en tiempo real (sonido + aviso en pantalla +
+título de la pestaña) apenas entra.
+
+`admin.html` ya no tiene link visible desde el catálogo público — entra
+directo a esa URL cuando la necesites.
 
 ## 1. Proyecto de Supabase
 

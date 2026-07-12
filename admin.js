@@ -116,7 +116,7 @@ function tarjetaPedido(pedido) {
     <div class="order-card ${pedido.estado === 'nuevo' ? 'is-nuevo' : ''}">
       <div class="order-head">
         <div>
-          <div class="order-cliente">${pedido.cliente_nombre}</div>
+          <div class="order-cliente">${pedido.cliente_nombre}${pedido.tienda_nombre ? ' — ' + pedido.tienda_nombre : ''}</div>
           <div class="order-meta">${pedido.cliente_telefono}${pedido.cliente_direccion ? ' · ' + pedido.cliente_direccion : ''}</div>
           <div class="order-meta">${fecha}</div>
           <span class="order-badge ${pedido.estado}">${pedido.estado}</span>
