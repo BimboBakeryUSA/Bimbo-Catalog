@@ -2,9 +2,10 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v11 — búsqueda, filtros y vista compacta en admin';
+const VERSION = 'v12 — productos desde Supabase compartido con Inventory Pro';
 
-// CONFIG, supabaseClient y ESTADOS_SERVICIO vienen de config.js (compartido con admin.js)
+// CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
+// vienen de config.js (compartido con admin.js)
 
 // ============================================================
 // AUTENTICACIÓN — el catálogo requiere cuenta (cliente o admin)
@@ -33,10 +34,10 @@ async function cargarPerfilYEntrar() {
     .eq('id', user.id)
     .maybeSingle();
   perfilActual = perfil;
-  mostrarApp();
+  await mostrarApp();
 }
 
-function mostrarApp() {
+async function mostrarApp() {
   document.getElementById('authView').classList.add('hidden');
 
   const esAdmin = perfilActual?.role === 'admin';
@@ -46,6 +47,7 @@ function mostrarApp() {
   }
 
   document.getElementById('appShell').classList.remove('hidden');
+  await cargarProductos();
   renderChips();
   renderCatalogo();
   actualizarBadge();
@@ -208,26 +210,76 @@ function cambiarTabAuth(tab) {
 }
 
 // ============================================================
-// DATOS DE PRODUCTOS (de ejemplo — luego se puede conectar a Supabase)
+// DATOS DE PRODUCTOS — vienen de Supabase (proyecto "bimbo-inventory-pro",
+// tabla `products`), la MISMA base que usa la app de escaneo. Ya no hay
+// arreglo hardcodeado.
 // ============================================================
-const PRODUCTOS = [
-  { slug: 'pan-blanco-grande', nombre: 'Pan Blanco Grande', categoria: 'Pan de caja', precio: 42.5, descripcion: 'El clásico pan blanco Bimbo, suave y esponjoso, ideal para toda la familia.', color: '#FBEFD9' },
-  { slug: 'pan-integral', nombre: 'Pan Integral', categoria: 'Pan de caja', precio: 46.0, descripcion: 'Pan 100% integral, fuente de fibra, para un estilo de vida saludable.', color: '#F0E4CB' },
-  { slug: 'bimbollos', nombre: 'Bimbollos', categoria: 'Pan dulce', precio: 38.0, descripcion: 'Bollos suaves rellenos de crema, perfectos para acompañar tu café.', color: '#FCE9DE' },
-  { slug: 'panque-bimbo', nombre: 'Panqué Bimbo', categoria: 'Pan dulce', precio: 34.5, descripcion: 'Panqué esponjoso, ideal para el desayuno o la merienda.', color: '#FBF0D3' },
-  { slug: 'donas-bimbo', nombre: 'Donas Bimbo', categoria: 'Pan dulce', precio: 36.0, descripcion: 'Donas glaseadas, suaves y deliciosas, un clásico de siempre.', color: '#FBE4E9' },
-  { slug: 'tostado-bimbo', nombre: 'Pan Tostado', categoria: 'Pan de caja', precio: 32.0, descripcion: 'Pan tostado crujiente, perfecto para tus tostadas de la mañana.', color: '#F4E6CE' },
-  { slug: 'tortillas-de-harina', nombre: 'Tortillas de Harina', categoria: 'Tortillas', precio: 28.5, descripcion: 'Tortillas de harina suaves, listas para tacos, quesadillas y más.', color: '#F8EFDA' },
-  { slug: 'barritas-de-fresa', nombre: 'Barritas de Fresa', categoria: 'Repostería', precio: 30.0, descripcion: 'Barritas rellenas de mermelada de fresa con un toque crujiente.', color: '#FBDFE2' },
-];
+let PRODUCTOS = [];
+const PRODUCTOS_CACHE_KEY = 'catalogo-bimbo-productos-cache';
 
-// Ícono representativo por categoría (mientras no hay fotos reales).
+// Paleta de colores solo para el fondo de la tarjeta cuando no hay foto
+// real todavía. Es puramente cosmético — no se guarda en la base.
+const PALETA_COLORES = ['#FBEFD9', '#F0E4CB', '#FCE9DE', '#FBF0D3', '#FBE4E9', '#F4E6CE', '#F8EFDA', '#FBDFE2'];
+function colorParaProducto(upc) {
+  let hash = 0;
+  const str = String(upc || '');
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  return PALETA_COLORES[hash % PALETA_COLORES.length];
+}
+
+// Categoría fija por ahora: la tabla compartida no tiene columna de
+// categoría todavía. Se puede agregar más adelante si hace falta agrupar.
+const CATEGORIA_DEFAULT = 'Productos Bimbo';
+
+// Ícono representativo (mientras no hay fotos reales).
 const ICONOS_CATEGORIA = {
-  'Pan de caja': '🍞',
-  'Pan dulce': '🥐',
-  'Tortillas': '🫓',
-  'Repostería': '🍰',
+  [CATEGORIA_DEFAULT]: '🍞',
 };
+
+function mapProductoDB(row) {
+  const detalles = [];
+  if (row.unidades_caja) detalles.push(`${row.unidades_caja} pzas por caja`);
+  if (row.unidades_pallet) detalles.push(`${row.unidades_pallet} por tarima`);
+
+  return {
+    slug: row.upc,
+    nombre: row.producto,
+    categoria: CATEGORIA_DEFAULT,
+    precio: row.precio != null ? Number(row.precio) : null,
+    descripcion: detalles.length ? detalles.join(' · ') : 'Sin detalles adicionales.',
+    foto: row.foto || '',
+    color: colorParaProducto(row.upc),
+  };
+}
+
+// Trae los productos desde Supabase. Solo muestra productos con precio
+// asignado, para no exponerle "$0.00" a un cliente por algo que todavía
+// no tiene precio cargado.
+async function cargarProductos() {
+  if (!productsSupabaseClient) {
+    console.error('productsSupabaseClient no está configurado (revisa config.js)');
+    return;
+  }
+  try {
+    const { data, error } = await productsSupabaseClient
+      .from('products')
+      .select('upc, sku, producto, precio, unidades_caja, unidades_pallet, foto, activo')
+      .eq('activo', true)
+      .not('precio', 'is', null)
+      .gt('precio', 0)
+      .order('producto');
+    if (error) throw error;
+    PRODUCTOS = (data || []).map(mapProductoDB);
+    localStorage.setItem(PRODUCTOS_CACHE_KEY, JSON.stringify(PRODUCTOS));
+  } catch (err) {
+    console.error('Error cargando productos de Supabase, usando cache local:', err);
+    try {
+      PRODUCTOS = JSON.parse(localStorage.getItem(PRODUCTOS_CACHE_KEY)) || [];
+    } catch {
+      PRODUCTOS = [];
+    }
+  }
+}
 
 const STORAGE_KEY = 'catalogo-bimbo-carrito';
 
@@ -366,8 +418,13 @@ function crearTarjetaProducto(producto) {
 
   const image = document.createElement('div');
   image.className = 'card-image';
-  image.style.background = `linear-gradient(135deg, ${producto.color}, #ffffff)`;
-  image.innerHTML = `<span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span>`;
+  if (producto.foto) {
+    image.style.background = '#fff';
+    image.innerHTML = `<img src="${producto.foto}" alt="${producto.nombre}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">`;
+  } else {
+    image.style.background = `linear-gradient(135deg, ${producto.color}, #ffffff)`;
+    image.innerHTML = `<span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span>`;
+  }
   image.onclick = () => abrirDetalleProducto(producto.slug);
 
   const body = document.createElement('div');
@@ -401,11 +458,13 @@ function abrirDetalleProducto(slug) {
   const producto = PRODUCTOS.find((p) => p.slug === slug);
   if (!producto) return;
 
+  const imagenHtml = producto.foto
+    ? `<div class="detail-image"><img src="${producto.foto}" alt="${producto.nombre}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></div>`
+    : `<div class="detail-image" style="background:linear-gradient(135deg, ${producto.color}, #ffffff)"><span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span></div>`;
+
   const body = document.getElementById('productModalBody');
   body.innerHTML = `
-    <div class="detail-image" style="background:linear-gradient(135deg, ${producto.color}, #ffffff)">
-      <span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span>
-    </div>
+    ${imagenHtml}
     <span class="detail-category">${producto.categoria}</span>
     <h2 class="detail-name">${producto.nombre}</h2>
     <p class="detail-desc">${producto.descripcion}</p>

@@ -20,10 +20,24 @@ const CONFIG = {
   // los controlan las políticas RLS en la base de datos.
   SUPABASE_URL: 'https://zzoyblybwkxbitbvusfc.supabase.co',
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6b3libHlid2t4Yml0YnZ1c2ZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MDc4MjgsImV4cCI6MjA5OTM4MzgyOH0.5aYA67sT5gHbS6bgvaT5Q1zMuvtAvmb3nwLxLf3U_KU',
+
+  // Supabase de PRODUCTOS (proyecto "bimbo-inventory-pro") — es la MISMA
+  // tabla `products` que usa la app de escaneo. Es un proyecto de Supabase
+  // distinto al de arriba, así que se conecta con un cliente aparte.
+  // Esta llave es de SOLO LECTURA: las políticas RLS de esa tabla no
+  // permiten insert/update/delete con la anon key, solo SELECT.
+  PRODUCTS_SUPABASE_URL: 'https://obfikwhukpzelsghowcq.supabase.co',
+  PRODUCTS_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iZmlrd2h1a3B6ZWxzZ2hvd2NxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3MjU3NzMsImV4cCI6MjA5OTMwMTc3M30.sKfI_riLcFZA9GyGM6ugW3ELrNb-kLxGNVE53Dv4G70',
 };
 
 const supabaseClient = window.supabase
   ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY)
+  : null;
+
+// Cliente aparte, apuntando al proyecto de productos compartido con
+// Inventory Pro. Se usa solo para leer el catálogo de productos.
+const productsSupabaseClient = window.supabase
+  ? window.supabase.createClient(CONFIG.PRODUCTS_SUPABASE_URL, CONFIG.PRODUCTS_SUPABASE_ANON_KEY)
   : null;
 
 // Estados que se atienden (usado en registro, checkout y filtros de admin).
