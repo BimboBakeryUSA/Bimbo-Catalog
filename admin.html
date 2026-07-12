@@ -29,7 +29,16 @@
     <header class="topbar">
       <div class="topbar-inner">
         <span class="brand">Panel <strong>Bimbo</strong></span>
-        <button id="logoutBtn" class="cart-btn">Salir</button>
+        <div id="profileWrap" class="profile-wrap hidden">
+          <button id="profileBtn" class="profile-btn" aria-label="Perfil">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          </button>
+          <div id="profileDropdown" class="profile-dropdown hidden">
+            <div class="profile-email" id="profileEmail"></div>
+            <a href="index.html" id="profileLinkCatalogo">Catálogo</a>
+            <button id="profileLogoutBtn" class="danger">Cerrar sesión</button>
+          </div>
+        </div>
       </div>
     </header>
     <main class="view">
@@ -49,6 +58,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="config.js?v=5"></script>
+  <script src="profile-menu.js?v=5"></script>
   <script src="admin.js?v=5"></script>
 </body>
 </html>

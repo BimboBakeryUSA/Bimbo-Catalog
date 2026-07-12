@@ -28,6 +28,7 @@ function mostrarPanel() {
   document.getElementById('ordersView').classList.remove('hidden');
   cargarPedidos();
   suscribirseATiempoReal();
+  initProfileMenu({ linkCatalogo: true, onLogout: cerrarSesion });
 }
 
 async function iniciarSesion() {
@@ -117,7 +118,8 @@ function tarjetaPedido(pedido) {
       <div class="order-head">
         <div>
           <div class="order-cliente">${pedido.cliente_nombre}${pedido.tienda_nombre ? ' — ' + pedido.tienda_nombre : ''}</div>
-          <div class="order-meta">${pedido.cliente_telefono}${pedido.cliente_direccion ? ' · ' + pedido.cliente_direccion : ''}</div>
+          <div class="order-meta">${pedido.cliente_telefono}</div>
+          <div class="order-meta">${pedido.cliente_direccion || ''}${pedido.cliente_ciudad ? ', ' + pedido.cliente_ciudad : ''}${pedido.cliente_estado ? ', ' + pedido.cliente_estado : ''} ${pedido.cliente_zip || ''}</div>
           <div class="order-meta">${fecha}</div>
           <span class="order-badge ${pedido.estado}">${pedido.estado}</span>
         </div>
@@ -204,8 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('loginPassword').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') iniciarSesion();
   });
-  document.getElementById('logoutBtn').addEventListener('click', cerrarSesion);
-
   document.getElementById('ordersFilter').querySelectorAll('.chip').forEach((btn) => {
     btn.addEventListener('click', () => {
       filtroEstado = btn.dataset.estado;

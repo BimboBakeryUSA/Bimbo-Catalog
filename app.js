@@ -2,7 +2,14 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v4 — tienda/dirección obligatorios, WhatsApp opcional';
+const VERSION = 'v5 — dirección completa + menú de perfil';
+
+const ESTADOS_SERVICIO = [
+  { valor: 'MD', nombre: 'Maryland' },
+  { valor: 'DC', nombre: 'Washington D.C.' },
+  { valor: 'VA', nombre: 'Virginia' },
+  { valor: 'DE', nombre: 'Delaware' },
+];
 
 // CONFIG y supabaseClient vienen de config.js (compartido con admin.js)
 
@@ -251,12 +258,20 @@ function renderCartModal() {
     ${filas}
     <div class="cart-total"><span>Total</span><strong>$${totalCarrito().toFixed(2)}</strong></div>
     <div id="checkoutFormWrap">
-      <input class="form-field" id="inputNombre" placeholder="Nombre completo" />
+      <input class="form-field" id="inputTienda" placeholder="Nombre de la tienda" />
+      <input class="form-field" id="inputNombre" placeholder="Nombre de quien solicita" />
       <input class="form-field" id="inputTelefono" placeholder="Teléfono" />
       <input class="form-field" id="inputDireccion" placeholder="Dirección" />
-      <input class="form-field" id="inputTienda" placeholder="Nombre de la tienda" />
+      <div class="form-row">
+        <input class="form-field" id="inputCiudad" placeholder="Ciudad" />
+        <select class="form-field" id="inputEstado">
+          <option value="">Estado</option>
+          ${ESTADOS_SERVICIO.map((e) => `<option value="${e.valor}">${e.valor} — ${e.nombre}</option>`).join('')}
+        </select>
+        <input class="form-field" id="inputZip" placeholder="ZIP" inputmode="numeric" maxlength="5" />
+      </div>
       <textarea class="form-field" id="inputNotas" placeholder="Notas (opcional)" rows="2"></textarea>
-      <p id="checkoutError" class="error-text hidden">Completa nombre, teléfono, dirección y nombre de la tienda.</p>
+      <p id="checkoutError" class="error-text hidden">Completa todos los campos (nombre, teléfono, tienda, dirección, ciudad, estado y ZIP).</p>
       <button class="btn-primary" id="enviarPedidoBtn">Enviar pedido</button>
       <p class="hint-text">Tu pedido queda registrado de una vez. Compartirlo por WhatsApp es opcional.</p>
     </div>
@@ -286,10 +301,10 @@ function construirMensajePedido(cliente) {
   const lineas = [
     'Nuevo pedido - Catálogo Bimbo',
     '',
-    `Cliente: ${cliente.nombre}`,
-    `Teléfono: ${cliente.telefono}`,
-    `Dirección: ${cliente.direccion}`,
     `Tienda: ${cliente.tienda}`,
+    `Solicita: ${cliente.nombre}`,
+    `Teléfono: ${cliente.telefono}`,
+    `Dirección: ${cliente.direccion}, ${cliente.ciudad}, ${cliente.estado} ${cliente.zip}`,
     cliente.notas ? `Notas: ${cliente.notas}` : null,
     '',
     ...carrito.map((i) => `• ${i.nombre} x${i.cantidad} - $${(i.precio * i.cantidad).toFixed(2)}`),
@@ -300,15 +315,18 @@ function construirMensajePedido(cliente) {
 }
 
 async function enviarPedido() {
+  const tienda = document.getElementById('inputTienda').value.trim();
   const nombre = document.getElementById('inputNombre').value.trim();
   const telefono = document.getElementById('inputTelefono').value.trim();
   const direccion = document.getElementById('inputDireccion').value.trim();
-  const tienda = document.getElementById('inputTienda').value.trim();
+  const ciudad = document.getElementById('inputCiudad').value.trim();
+  const estado = document.getElementById('inputEstado').value.trim();
+  const zip = document.getElementById('inputZip').value.trim();
   const notas = document.getElementById('inputNotas').value.trim();
   const errorEl = document.getElementById('checkoutError');
   const btn = document.getElementById('enviarPedidoBtn');
 
-  if (!nombre || !telefono || !direccion || !tienda) {
+  if (!tienda || !nombre || !telefono || !direccion || !ciudad || !estado || !zip) {
     errorEl.classList.remove('hidden');
     return;
   }
@@ -316,7 +334,7 @@ async function enviarPedido() {
   btn.disabled = true;
   btn.textContent = 'Enviando...';
 
-  const cliente = { nombre, telefono, direccion, tienda, notas };
+  const cliente = { tienda, nombre, telefono, direccion, ciudad, estado, zip, notas };
   const mensaje = construirMensajePedido(cliente);
 
   // 1) Guardar el pedido en Supabase — esto es lo que hace que el
@@ -327,6 +345,9 @@ async function enviarPedido() {
         cliente_nombre: nombre,
         cliente_telefono: telefono,
         cliente_direccion: direccion,
+        cliente_ciudad: ciudad,
+        cliente_estado: estado,
+        cliente_zip: zip,
         tienda_nombre: tienda,
         cliente_notas: notas || null,
         items: carrito,
@@ -346,7 +367,7 @@ async function enviarPedido() {
         to_email: CONFIG.ORDER_EMAIL_TO,
         cliente_nombre: nombre,
         cliente_telefono: telefono,
-        cliente_direccion: direccion,
+        cliente_direccion: `${direccion}, ${ciudad}, ${estado} ${zip}`,
         tienda_nombre: tienda,
         cliente_notas: notas || '-',
         pedido_detalle: mensaje,
@@ -407,6 +428,14 @@ document.addEventListener('DOMContentLoaded', () => {
   renderChips();
   renderCatalogo();
   actualizarBadge();
+
+  initProfileMenu({
+    linkPedidos: true,
+    onLogout: async () => {
+      await supabaseClient.auth.signOut();
+      location.reload();
+    },
+  });
 
   document.getElementById('searchInput').addEventListener('input', (e) => {
     textoBusqueda = e.target.value;

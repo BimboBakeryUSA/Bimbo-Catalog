@@ -4,16 +4,21 @@ Catálogo web público de productos Bimbo. App estática (sin build, sin npm):
 `index.html` (catálogo) + `admin.html` (panel de pedidos) + `config.js` +
 `app.js` + `admin.js` + `styles.css`.
 
-El cliente navega productos, arma un pedido y llena nombre, teléfono,
-dirección y nombre de la tienda (todos obligatorios). El pedido queda
-completo en cuanto se guarda en **Supabase** (y se manda copia por correo
-si configuraste EmailJS) — compartirlo por WhatsApp es un botón opcional
-en la pantalla de confirmación, no bloquea nada. Tú, como admin, lo ves en
-`admin.html` con notificación en tiempo real (sonido + aviso en pantalla +
-título de la pestaña) apenas entra.
+El cliente navega productos, arma un pedido y llena: nombre de la tienda,
+nombre de quien solicita, teléfono, dirección, ciudad, estado (MD/DC/VA/DE)
+y ZIP — todos obligatorios. El pedido queda completo en cuanto se guarda en
+**Supabase** (y se manda copia por correo si configuraste EmailJS) —
+compartirlo por WhatsApp es un botón opcional en la pantalla de
+confirmación, no bloquea nada. Tú, como admin, lo ves en `admin.html` con
+notificación en tiempo real (sonido + aviso en pantalla + título de la
+pestaña) apenas entra.
 
 `admin.html` ya no tiene link visible desde el catálogo público — entra
-directo a esa URL cuando la necesites.
+directo a esa URL cuando la necesites. Una vez que inicias sesión ahí,
+aparece un ícono de perfil arriba a la derecha (también en el catálogo, si
+navegas de vuelta con la sesión activa) con un menú para alternar entre
+**Catálogo** y **Ver pedidos**, y cerrar sesión. Si no hay sesión iniciada
+(un cliente normal), ese ícono no aparece en ningún lado.
 
 ## 1. Proyecto de Supabase
 
@@ -67,12 +72,13 @@ Netlify, etc. No requiere build ni servidor.
 ## 5. Estructura
 
 ```
-index.html    ← catálogo público
-admin.html    ← panel de pedidos (requiere login)
-config.js     ← configuración compartida (WhatsApp, EmailJS, Supabase)
-app.js        ← lógica del catálogo/carrito/checkout
-admin.js      ← login, lista de pedidos, notificación en tiempo real
-styles.css    ← estilos (colores de marca Bimbo)
+index.html      ← catálogo público
+admin.html      ← panel de pedidos (requiere login)
+config.js       ← configuración compartida (WhatsApp, EmailJS, Supabase)
+profile-menu.js ← menú de perfil arriba a la derecha (compartido)
+app.js          ← lógica del catálogo/carrito/checkout
+admin.js        ← login, lista de pedidos, notificación en tiempo real
+styles.css      ← estilos (colores de marca Bimbo)
 ```
 
 ## 6. Siguientes pasos
