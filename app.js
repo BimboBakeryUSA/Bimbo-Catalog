@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v7 — aprobación de cuentas por el admin';
+const VERSION = 'v10 — pantalla de espera se actualiza sola al aprobar';
 
 const ESTADOS_SERVICIO = [
   { valor: 'MD', nombre: 'Maryland' },
@@ -66,14 +66,43 @@ function mostrarApp() {
   });
 }
 
+let canalMiPerfil = null;
+
 function mostrarPendiente() {
   document.getElementById('pendienteView').classList.remove('hidden');
+  actualizarMensajePendiente();
+  suscribirseAMiPerfil();
+}
+
+function actualizarMensajePendiente() {
   const msg = document.getElementById('pendienteMensaje');
   if (perfilActual?.estado_cuenta === 'rechazado') {
     msg.textContent = 'Tu cuenta fue rechazada. Contacta al administrador si crees que es un error.';
   } else {
     msg.textContent = 'Tu cuenta está pendiente de aprobación. Te avisaremos cuando puedas entrar a hacer pedidos.';
   }
+}
+
+// Mientras espera, si el admin aprueba desde su panel, esto lo detecta
+// solo y lo pasa al catálogo sin que tenga que cerrar sesión y reentrar.
+function suscribirseAMiPerfil() {
+  if (canalMiPerfil || !usuarioActual) return;
+  canalMiPerfil = supabaseClient
+    .channel('mi-perfil-cambios')
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${usuarioActual.id}` },
+      (payload) => {
+        perfilActual = payload.new;
+        if (perfilActual.estado_cuenta === 'aprobado' || perfilActual.role === 'admin') {
+          document.getElementById('pendienteView').classList.add('hidden');
+          mostrarApp();
+        } else {
+          actualizarMensajePendiente();
+        }
+      }
+    )
+    .subscribe();
 }
 
 async function iniciarSesion() {
@@ -95,12 +124,32 @@ async function iniciarSesion() {
   btn.textContent = 'Entrar';
 
   if (error) {
-    errorEl.textContent = 'Correo o contraseña incorrectos.';
+    errorEl.textContent = traducirErrorAuth(error);
     errorEl.classList.remove('hidden');
     return;
   }
   errorEl.classList.add('hidden');
   await cargarPerfilYEntrar();
+}
+
+function traducirErrorAuth(error) {
+  const msg = (error?.message || '').toLowerCase();
+  if (msg.includes('already registered') || msg.includes('already exists')) {
+    return 'Ya existe una cuenta con este correo. Ve a la pestaña "Iniciar sesión" en vez de crear una nueva.';
+  }
+  if (msg.includes('email not confirmed') || msg.includes('not confirmed')) {
+    return 'Todavía no confirmas tu correo. Revisa tu bandeja de entrada (y spam) y da clic en el link de confirmación antes de entrar.';
+  }
+  if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+    return 'Correo o contraseña incorrectos.';
+  }
+  if (msg.includes('rate limit') || msg.includes('security purposes') || msg.includes('seconds')) {
+    return 'Ya se pidió una cuenta con este correo hace muy poco. Espera un momento y vuelve a intentar, o revisa tu correo — el link de confirmación ya se envió.';
+  }
+  if (msg.includes('password')) {
+    return 'La contraseña debe tener al menos 6 caracteres.';
+  }
+  return error?.message || 'Ocurrió un error. Intenta de nuevo.';
 }
 
 async function registrarse() {
@@ -114,15 +163,14 @@ async function registrarse() {
   const email = document.getElementById('regEmail').value.trim();
   const password = document.getElementById('regPassword').value;
   const errorEl = document.getElementById('registroError');
-  const okEl = document.getElementById('registroOk');
   const btn = document.getElementById('registroBtn');
 
-  okEl.classList.add('hidden');
   if (!tienda || !nombre || !telefono || !direccion || !ciudad || !estado || !zip || !email || !password) {
     errorEl.textContent = 'Completa todos los campos para crear tu cuenta.';
     errorEl.classList.remove('hidden');
     return;
   }
+  errorEl.classList.add('hidden');
 
   btn.disabled = true;
   btn.textContent = 'Creando...';
@@ -137,7 +185,7 @@ async function registrarse() {
   btn.textContent = 'Crear cuenta';
 
   if (error) {
-    errorEl.textContent = error.message || 'No se pudo crear la cuenta.';
+    errorEl.textContent = traducirErrorAuth(error);
     errorEl.classList.remove('hidden');
     return;
   }
@@ -146,9 +194,18 @@ async function registrarse() {
   if (data.session) {
     await cargarPerfilYEntrar();
   } else {
-    okEl.textContent = 'Cuenta creada. Si tu correo requiere confirmación, revisa tu bandeja antes de entrar.';
-    okEl.classList.remove('hidden');
+    mostrarRegistroExitoso(
+      'Te mandamos un correo para confirmar tu cuenta. Una vez que lo confirmes, inicia sesión aquí — tu cuenta también deberá ser aprobada por el administrador antes de poder hacer pedidos.'
+    );
   }
+}
+
+function mostrarRegistroExitoso(mensaje) {
+  document.querySelector('.auth-tabs').classList.add('hidden');
+  document.getElementById('loginForm').classList.add('hidden');
+  document.getElementById('registroForm').classList.add('hidden');
+  document.getElementById('registroExitosoMsg').textContent = mensaje;
+  document.getElementById('registroExitosoView').classList.remove('hidden');
 }
 
 function cambiarTabAuth(tab) {
@@ -583,9 +640,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') iniciarSesion();
   });
   document.getElementById('registroBtn').addEventListener('click', registrarse);
+  document.getElementById('volverALoginBtn').addEventListener('click', () => {
+    document.getElementById('registroExitosoView').classList.add('hidden');
+    document.querySelector('.auth-tabs').classList.remove('hidden');
+    cambiarTabAuth('login');
+  });
   document.getElementById('pendienteLogoutBtn').addEventListener('click', async () => {
     await supabaseClient.auth.signOut();
     location.reload();
+  });
+  document.getElementById('pendienteRefrescarBtn').addEventListener('click', async () => {
+    document.getElementById('pendienteView').classList.add('hidden');
+    await cargarPerfilYEntrar();
   });
 
   mostrarSegunSesion();

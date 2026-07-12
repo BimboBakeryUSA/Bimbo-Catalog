@@ -32,6 +32,17 @@ ambos pueden volver al "Catálogo" o cerrar sesión desde ahí. Si alguien sin
 permisos de admin intenta entrar a `admin.html`, se le rechaza con un
 mensaje y se cierra su sesión ahí.
 
+### Nota sobre el límite de reintento al registrarse
+
+Ese mensaje de "espera unos segundos" no lo pone esta app — es un límite de
+seguridad de Supabase para evitar que alguien bombardee de correos una
+misma cuenta (agrupa cualquier reenvío de confirmación bajo un cooldown
+corto, no una regla de "cada cuánto te puedes registrar"). No se puede
+cambiar por SQL/migración; vive en el dashboard de Supabase en
+Authentication → Rate Limits. Desactivar "Confirm email" (ver nota de abajo)
+elimina este problema de raíz, porque ya no hay correo de confirmación que
+reenviar ni límite que golpear.
+
 ### Nota sobre confirmación de correo
 
 Por default, Supabase pide confirmar el correo antes de poder iniciar

@@ -6,6 +6,17 @@ let filtroEstado = 'todos';
 let pedidosNuevosSinVer = 0;
 const TITULO_BASE = 'Panel de pedidos — Catálogo Bimbo';
 
+function traducirErrorAuth(error) {
+  const msg = (error?.message || '').toLowerCase();
+  if (msg.includes('email not confirmed') || msg.includes('not confirmed')) {
+    return 'Todavía no se confirma este correo. Revisa la bandeja de entrada (y spam) y confirma antes de entrar.';
+  }
+  if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+    return 'Correo o contraseña incorrectos.';
+  }
+  return error?.message || 'Ocurrió un error. Intenta de nuevo.';
+}
+
 // ============================================================
 // AUTENTICACIÓN
 // ============================================================
@@ -73,7 +84,7 @@ async function iniciarSesion() {
   btn.textContent = 'Entrar';
 
   if (error) {
-    errorEl.textContent = 'Correo o contraseña incorrectos.';
+    errorEl.textContent = traducirErrorAuth(error);
     errorEl.classList.remove('hidden');
     return;
   }

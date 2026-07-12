@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=7" />
+<link rel="stylesheet" href="styles.css?v=10" />
 </head>
 <body>
 
@@ -42,8 +42,14 @@
         <input class="form-field" id="regEmail" type="email" placeholder="Correo" autocomplete="username" />
         <input class="form-field" id="regPassword" type="password" placeholder="Contraseña" autocomplete="new-password" />
         <p id="registroError" class="error-text hidden"></p>
-        <p id="registroOk" class="hint-text hidden"></p>
         <button class="btn-primary" id="registroBtn">Crear cuenta</button>
+      </div>
+
+      <div id="registroExitosoView" class="confirm-state hidden">
+        <div class="confirm-icon">✓</div>
+        <h3>¡Cuenta creada!</h3>
+        <p id="registroExitosoMsg"></p>
+        <button class="btn-primary" id="volverALoginBtn">Ir a iniciar sesión</button>
       </div>
     </div>
   </div>
@@ -54,6 +60,7 @@
       <span class="hero-eyebrow">Catálogo Bimbo</span>
       <h1 class="login-title">Un momento...</h1>
       <p id="pendienteMensaje" class="hint-text" style="margin-top:0;"></p>
+      <button class="btn-primary" id="pendienteRefrescarBtn" style="margin-bottom:10px;">Ya me aprobaron, actualizar</button>
       <button class="btn-secondary" id="pendienteLogoutBtn">Cerrar sesión</button>
     </div>
   </div>
@@ -123,8 +130,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <!-- Supabase (login, catálogo gated, guarda cada pedido) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=7"></script>
-  <script src="profile-menu.js?v=7"></script>
-  <script src="app.js?v=7"></script>
+  <script src="config.js?v=10"></script>
+  <script src="profile-menu.js?v=10"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>
