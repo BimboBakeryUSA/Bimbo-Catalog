@@ -2,16 +2,9 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v10 — pantalla de espera se actualiza sola al aprobar';
+const VERSION = 'v11 — búsqueda, filtros y vista compacta en admin';
 
-const ESTADOS_SERVICIO = [
-  { valor: 'MD', nombre: 'Maryland' },
-  { valor: 'DC', nombre: 'Washington D.C.' },
-  { valor: 'VA', nombre: 'Virginia' },
-  { valor: 'DE', nombre: 'Delaware' },
-];
-
-// CONFIG y supabaseClient vienen de config.js (compartido con admin.js)
+// CONFIG, supabaseClient y ESTADOS_SERVICIO vienen de config.js (compartido con admin.js)
 
 // ============================================================
 // AUTENTICACIÓN — el catálogo requiere cuenta (cliente o admin)
@@ -544,6 +537,7 @@ async function enviarPedido() {
     try {
       await supabaseClient.from('pedidos').insert({
         user_id: usuarioActual?.id,
+        cliente_email: usuarioActual?.email || null,
         cliente_nombre: nombre,
         cliente_telefono: telefono,
         cliente_direccion: direccion,

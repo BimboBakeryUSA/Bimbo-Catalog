@@ -3,6 +3,10 @@
 
 let pedidos = [];
 let filtroEstado = 'todos';
+let busquedaPedidos = '';
+let filtroEstadoUSPedidos = '';
+let filtroZipPedidos = '';
+let pedidosExpandido = new Set();
 let pedidosNuevosSinVer = 0;
 const TITULO_BASE = 'Panel de pedidos — Catálogo Bimbo';
 
@@ -116,11 +120,23 @@ async function cargarPedidos() {
 
 function renderPedidos() {
   const wrap = document.getElementById('ordersWrap');
-  const filtrados =
-    filtroEstado === 'todos' ? pedidos : pedidos.filter((p) => p.estado === filtroEstado);
+  const texto = busquedaPedidos.trim().toLowerCase();
+
+  const filtrados = pedidos.filter((p) => {
+    const coincideEstado = filtroEstado === 'todos' || p.estado === filtroEstado;
+    const coincideTexto =
+      !texto ||
+      (p.cliente_nombre || '').toLowerCase().includes(texto) ||
+      (p.cliente_telefono || '').toLowerCase().includes(texto) ||
+      (p.cliente_email || '').toLowerCase().includes(texto) ||
+      (p.tienda_nombre || '').toLowerCase().includes(texto);
+    const coincideEstadoUS = !filtroEstadoUSPedidos || p.cliente_estado === filtroEstadoUSPedidos;
+    const coincideZip = !filtroZipPedidos || (p.cliente_zip || '').includes(filtroZipPedidos);
+    return coincideEstado && coincideTexto && coincideEstadoUS && coincideZip;
+  });
 
   if (filtrados.length === 0) {
-    wrap.innerHTML = '<p class="empty-state">No hay pedidos por aquí todavía.</p>';
+    wrap.innerHTML = '<p class="empty-state">No hay pedidos con estos filtros.</p>';
     return;
   }
 
@@ -132,9 +148,31 @@ function renderPedidos() {
       actualizarEstado(id, estado);
     });
   });
+  wrap.querySelectorAll('[data-expandir]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.expandir;
+      if (pedidosExpandido.has(id)) pedidosExpandido.delete(id);
+      else pedidosExpandido.add(id);
+      renderPedidos();
+    });
+  });
 }
 
 function tarjetaPedido(pedido) {
+  const expandido = pedido.estado !== 'completado' || pedidosExpandido.has(pedido.id);
+
+  if (!expandido) {
+    const fechaCorta = new Date(pedido.created_at).toLocaleDateString('es-MX', { dateStyle: 'medium' });
+    return `
+      <div class="order-row-compact" data-expandir="${pedido.id}">
+        <span class="compact-nombre">${pedido.tienda_nombre || pedido.cliente_nombre}</span>
+        <span class="compact-meta">${fechaCorta}</span>
+        <span class="order-badge completado">completado</span>
+        <span class="compact-total">$${Number(pedido.total).toFixed(2)}</span>
+      </div>
+    `;
+  }
+
   const fecha = new Date(pedido.created_at).toLocaleString('es-MX', {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -146,13 +184,14 @@ function tarjetaPedido(pedido) {
   const acciones = [];
   if (pedido.estado === 'nuevo') acciones.push(`<button data-id="${pedido.id}" data-marcar="visto">Marcar visto</button>`);
   if (pedido.estado !== 'completado') acciones.push(`<button data-id="${pedido.id}" data-marcar="completado">Marcar completado</button>`);
+  if (pedido.estado === 'completado') acciones.push(`<button data-expandir="${pedido.id}">Minimizar</button>`);
 
   return `
     <div class="order-card ${pedido.estado === 'nuevo' ? 'is-nuevo' : ''}">
       <div class="order-head">
         <div>
           <div class="order-cliente">${pedido.cliente_nombre}${pedido.tienda_nombre ? ' — ' + pedido.tienda_nombre : ''}</div>
-          <div class="order-meta">${pedido.cliente_telefono}</div>
+          <div class="order-meta">${pedido.cliente_telefono}${pedido.cliente_email ? ' · ' + pedido.cliente_email : ''}</div>
           <div class="order-meta">${pedido.cliente_direccion || ''}${pedido.cliente_ciudad ? ', ' + pedido.cliente_ciudad : ''}${pedido.cliente_estado ? ', ' + pedido.cliente_estado : ''} ${pedido.cliente_zip || ''}</div>
           <div class="order-meta">${fecha}</div>
           <span class="order-badge ${pedido.estado}">${pedido.estado}</span>
@@ -235,19 +274,27 @@ function notificarPedidoNuevo() {
 // ============================================================
 let usuarios = [];
 let filtroUsuarios = 'todos';
+let busquedaUsuarios = '';
+let filtroEstadoUSUsuarios = '';
+let filtroZipUsuarios = '';
+let usuariosExpandido = new Set();
+
+// Orden de prioridad para mostrar pendientes primero (no alfabético).
+const ORDEN_ESTADO_CUENTA = { pendiente: 0, rechazado: 1, aprobado: 2 };
 
 async function cargarUsuarios() {
   const { data, error } = await supabaseClient
     .from('profiles')
     .select('*')
-    .order('estado_cuenta', { ascending: true })
     .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error cargando usuarios:', error);
     return;
   }
-  usuarios = data || [];
+  usuarios = (data || []).sort(
+    (a, b) => (ORDEN_ESTADO_CUENTA[a.estado_cuenta] ?? 9) - (ORDEN_ESTADO_CUENTA[b.estado_cuenta] ?? 9)
+  );
   renderUsuarios();
   actualizarBadgePendientes();
 }
@@ -261,11 +308,23 @@ function actualizarBadgePendientes() {
 
 function renderUsuarios() {
   const wrap = document.getElementById('usuariosWrap');
-  const filtrados =
-    filtroUsuarios === 'todos' ? usuarios : usuarios.filter((u) => u.estado_cuenta === filtroUsuarios);
+  const texto = busquedaUsuarios.trim().toLowerCase();
+
+  const filtrados = usuarios.filter((u) => {
+    const coincideFiltro = filtroUsuarios === 'todos' || u.estado_cuenta === filtroUsuarios;
+    const coincideTexto =
+      !texto ||
+      (u.nombre || '').toLowerCase().includes(texto) ||
+      (u.telefono || '').toLowerCase().includes(texto) ||
+      (u.email || '').toLowerCase().includes(texto) ||
+      (u.tienda_nombre || '').toLowerCase().includes(texto);
+    const coincideEstadoUS = !filtroEstadoUSUsuarios || u.estado === filtroEstadoUSUsuarios;
+    const coincideZip = !filtroZipUsuarios || (u.zip || '').includes(filtroZipUsuarios);
+    return coincideFiltro && coincideTexto && coincideEstadoUS && coincideZip;
+  });
 
   if (filtrados.length === 0) {
-    wrap.innerHTML = '<p class="empty-state">No hay usuarios en esta vista.</p>';
+    wrap.innerHTML = '<p class="empty-state">No hay usuarios con estos filtros.</p>';
     return;
   }
 
@@ -280,9 +339,31 @@ function renderUsuarios() {
   wrap.querySelectorAll('[data-hacer-admin]').forEach((btn) => {
     btn.addEventListener('click', () => hacerAdmin(btn.dataset.hacerAdmin));
   });
+  wrap.querySelectorAll('[data-expandir-usuario]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.expandirUsuario;
+      if (usuariosExpandido.has(id)) usuariosExpandido.delete(id);
+      else usuariosExpandido.add(id);
+      renderUsuarios();
+    });
+  });
 }
 
 function tarjetaUsuario(u) {
+  const esCompactable = u.role !== 'admin' && u.estado_cuenta === 'aprobado';
+  const expandido = !esCompactable || usuariosExpandido.has(u.id);
+
+  if (!expandido) {
+    return `
+      <div class="order-row-compact" data-expandir-usuario="${u.id}">
+        <span class="compact-nombre">${u.tienda_nombre || u.nombre || u.email}</span>
+        <span class="compact-meta">${u.telefono || ''}</span>
+        <span class="compact-meta">${u.estado || ''} ${u.zip || ''}</span>
+        <span class="order-badge aprobado">aprobado</span>
+      </div>
+    `;
+  }
+
   const fecha = new Date(u.created_at).toLocaleDateString('es-MX', { dateStyle: 'medium' });
   const acciones = [];
 
@@ -297,6 +378,7 @@ function tarjetaUsuario(u) {
     if (u.estado_cuenta === 'aprobado') {
       acciones.push(`<button data-rechazar="${u.id}">Rechazar</button>`);
       acciones.push(`<button data-hacer-admin="${u.id}">Hacer admin</button>`);
+      acciones.push(`<button data-expandir-usuario="${u.id}">Minimizar</button>`);
     }
   }
 
@@ -359,8 +441,15 @@ function cambiarPanelAdmin(panel) {
 // ============================================================
 // INICIALIZACIÓN
 // ============================================================
+function poblarSelectsEstadoUS() {
+  const opciones = ESTADOS_SERVICIO.map((e) => `<option value="${e.valor}">${e.nombre}</option>`).join('');
+  document.getElementById('pedidosFiltroEstadoUS').insertAdjacentHTML('beforeend', opciones);
+  document.getElementById('usuariosFiltroEstadoUS').insertAdjacentHTML('beforeend', opciones);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   mostrarSegunSesion();
+  poblarSelectsEstadoUS();
 
   document.getElementById('loginBtn').addEventListener('click', iniciarSesion);
   document.getElementById('loginPassword').addEventListener('keydown', (e) => {
@@ -386,6 +475,32 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.classList.add('active');
       renderUsuarios();
     });
+  });
+
+  document.getElementById('pedidosBusqueda').addEventListener('input', (e) => {
+    busquedaPedidos = e.target.value;
+    renderPedidos();
+  });
+  document.getElementById('pedidosFiltroEstadoUS').addEventListener('change', (e) => {
+    filtroEstadoUSPedidos = e.target.value;
+    renderPedidos();
+  });
+  document.getElementById('pedidosFiltroZip').addEventListener('input', (e) => {
+    filtroZipPedidos = e.target.value;
+    renderPedidos();
+  });
+
+  document.getElementById('usuariosBusqueda').addEventListener('input', (e) => {
+    busquedaUsuarios = e.target.value;
+    renderUsuarios();
+  });
+  document.getElementById('usuariosFiltroEstadoUS').addEventListener('change', (e) => {
+    filtroEstadoUSUsuarios = e.target.value;
+    renderUsuarios();
+  });
+  document.getElementById('usuariosFiltroZip').addEventListener('input', (e) => {
+    filtroZipUsuarios = e.target.value;
+    renderUsuarios();
   });
 
   window.addEventListener('focus', () => {

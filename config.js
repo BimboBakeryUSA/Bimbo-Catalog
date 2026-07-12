@@ -25,3 +25,11 @@ const CONFIG = {
 const supabaseClient = window.supabase
   ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY)
   : null;
+
+// Estados que se atienden (usado en registro, checkout y filtros de admin).
+const ESTADOS_SERVICIO = [
+  { valor: 'MD', nombre: 'Maryland' },
+  { valor: 'DC', nombre: 'Washington D.C.' },
+  { valor: 'VA', nombre: 'Virginia' },
+  { valor: 'DE', nombre: 'Delaware' },
+];

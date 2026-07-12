@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=9" />
+<link rel="stylesheet" href="styles.css?v=11" />
 </head>
 <body>
 
@@ -61,6 +61,13 @@
             <button class="chip" data-estado="completado">Completados</button>
           </div>
         </div>
+        <div class="search-toolbar">
+          <input class="form-field" id="pedidosBusqueda" placeholder="Buscar por nombre, teléfono o correo..." />
+          <select class="form-field" id="pedidosFiltroEstadoUS">
+            <option value="">Estado (todos)</option>
+          </select>
+          <input class="form-field" id="pedidosFiltroZip" placeholder="ZIP" inputmode="numeric" maxlength="5" />
+        </div>
         <div id="ordersWrap"></div>
       </div>
 
@@ -73,14 +80,21 @@
             <button class="chip" data-filtro="aprobado">Aprobados</button>
           </div>
         </div>
+        <div class="search-toolbar">
+          <input class="form-field" id="usuariosBusqueda" placeholder="Buscar por nombre, teléfono o correo..." />
+          <select class="form-field" id="usuariosFiltroEstadoUS">
+            <option value="">Estado (todos)</option>
+          </select>
+          <input class="form-field" id="usuariosFiltroZip" placeholder="ZIP" inputmode="numeric" maxlength="5" />
+        </div>
         <div id="usuariosWrap"></div>
       </div>
     </main>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=9"></script>
-  <script src="profile-menu.js?v=9"></script>
-  <script src="admin.js?v=9"></script>
+  <script src="config.js?v=11"></script>
+  <script src="profile-menu.js?v=11"></script>
+  <script src="admin.js?v=11"></script>
 </body>
 </html>

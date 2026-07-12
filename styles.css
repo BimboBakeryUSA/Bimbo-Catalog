@@ -698,3 +698,49 @@ select.form-field {
   transition: all 0.15s ease;
 }
 .order-actions button:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+.search-toolbar {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.search-toolbar .form-field { margin-bottom: 0; }
+@media (max-width: 640px) {
+  .search-toolbar { grid-template-columns: 1fr; }
+}
+
+/* Fila compacta (pedidos completados / usuarios aprobados) */
+.order-row-compact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  cursor: pointer;
+  background: #fff;
+  transition: background 0.15s ease;
+}
+.order-row-compact:hover { background: var(--surface); }
+.order-row-compact .compact-nombre {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.order-row-compact .compact-meta {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.order-row-compact .compact-total {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--ink);
+  white-space: nowrap;
+}

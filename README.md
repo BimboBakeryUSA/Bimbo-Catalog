@@ -32,6 +32,21 @@ ambos pueden volver al "Catálogo" o cerrar sesión desde ahí. Si alguien sin
 permisos de admin intenta entrar a `admin.html`, se le rechaza con un
 mensaje y se cierra su sesión ahí.
 
+### Búsqueda, filtros y vista compacta (admin)
+
+Para que el panel siga siendo usable con cientos de pedidos/clientes:
+
+- **Pedidos completados** y **usuarios aprobados** se muestran como una
+  fila compacta de una sola línea (nombre, dato clave, estado, total) en
+  vez de la tarjeta completa. Haz clic en la fila para expandirla, o en
+  "Minimizar" para volver a compactarla.
+- Ambas pestañas (**Pedidos** y **Usuarios**) tienen una barra de búsqueda
+  (por nombre, teléfono o correo), un filtro por estado de EE.UU.
+  (MD/DC/VA/DE) y un filtro por ZIP. Se combinan con los chips de estado
+  (Nuevos/Vistos/Completados, Pendientes/Aprobados).
+- En Usuarios, las cuentas **pendientes** siempre aparecen primero,
+  seguidas de rechazadas y luego aprobadas (en vez de orden alfabético).
+
 ### Nota sobre el límite de reintento al registrarse
 
 Ese mensaje de "espera unos segundos" no lo pone esta app — es un límite de
