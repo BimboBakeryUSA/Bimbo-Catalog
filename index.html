@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Catálogo Bimbo</title>
+<link rel="stylesheet" href="styles.css?v=1" />
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="brand">Catálogo <strong>Bimbo</strong></span>
+      <button id="cartBtn" class="cart-btn">
+        🛒 Mi pedido
+        <span id="cartBadge" class="cart-badge hidden">0</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="catalogView" class="view">
+    <section class="hero">
+      <h1>Nuestro Catálogo</h1>
+      <p>Elige tus productos favoritos y arma tu pedido en minutos.</p>
+    </section>
+
+    <div class="search-row">
+      <input id="searchInput" type="text" placeholder="Buscar producto..." />
+    </div>
+
+    <div id="categoriesWrap"></div>
+  </main>
+
+  <!-- Modal: detalle de producto -->
+  <div id="productModal" class="modal hidden">
+    <div class="modal-card">
+      <button class="modal-close" data-close="productModal">✕</button>
+      <div id="productModalBody"></div>
+    </div>
+  </div>
+
+  <!-- Modal: carrito / checkout -->
+  <div id="cartModal" class="modal hidden">
+    <div class="modal-card">
+      <button class="modal-close" data-close="cartModal">✕</button>
+      <div id="cartModalBody"></div>
+    </div>
+  </div>
+
+  <!-- EmailJS (envío de correo sin backend) -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="app.js?v=1"></script>
+</body>
+</html>

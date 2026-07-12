@@ -1,0 +1,294 @@
+:root {
+  --bimbo-red: #EB0827;
+  --bimbo-red-dark: #B8061E;
+  --bimbo-blue: #181E6B;
+  --bg: #ffffff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: #222;
+}
+
+.hidden { display: none !important; }
+
+/* Topbar */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+.topbar-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--bimbo-red);
+}
+.brand strong { color: var(--bimbo-blue); }
+
+.cart-btn {
+  position: relative;
+  background: var(--bimbo-blue);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.cart-btn:hover { background: var(--bimbo-red); }
+.cart-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--bimbo-red);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 999px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Layout */
+.view {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+}
+
+.hero {
+  background: var(--bimbo-red);
+  color: #fff;
+  border-radius: 16px;
+  padding: 36px 20px;
+  text-align: center;
+  margin-bottom: 24px;
+}
+.hero h1 { margin: 0 0 8px; font-size: 1.8rem; }
+.hero p { margin: 0; opacity: 0.9; }
+
+.search-row { margin-bottom: 20px; }
+.search-row input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  font-size: 1rem;
+}
+
+.category-title {
+  color: var(--bimbo-blue);
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin: 24px 0 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+@media (min-width: 640px) {
+  .grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 900px) {
+  .grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.card {
+  border: 1px solid #eee;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.card-image {
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 700;
+  color: var(--bimbo-blue);
+  padding: 8px;
+  cursor: pointer;
+}
+.card-body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.card-category {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #999;
+}
+.card-name {
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+.card-name:hover { color: var(--bimbo-red); }
+.card-price {
+  margin-top: auto;
+  font-weight: 800;
+  color: var(--bimbo-red);
+}
+.card-add {
+  border: none;
+  background: var(--bimbo-blue);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.card-add:hover { background: var(--bimbo-red); }
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 30;
+}
+@media (min-width: 640px) {
+  .modal { align-items: center; }
+}
+.modal-card {
+  background: #fff;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 18px 18px 0 0;
+  padding: 20px;
+  position: relative;
+}
+@media (min-width: 640px) {
+  .modal-card { border-radius: 18px; }
+}
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  border: none;
+  background: #f2f2f2;
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+/* Product detail modal */
+.detail-image {
+  height: 180px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--bimbo-blue);
+  text-align: center;
+  padding: 10px;
+  margin-bottom: 16px;
+}
+.detail-category { font-size: 0.7rem; text-transform: uppercase; color: #999; }
+.detail-name { font-size: 1.3rem; font-weight: 800; margin: 6px 0; }
+.detail-desc { color: #555; margin-bottom: 12px; }
+.detail-price { font-size: 1.6rem; font-weight: 800; color: var(--bimbo-red); margin-bottom: 16px; }
+
+.btn-primary {
+  width: 100%;
+  border: none;
+  background: var(--bimbo-blue);
+  color: #fff;
+  padding: 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.btn-primary:hover { background: var(--bimbo-red); }
+.btn-primary:disabled { opacity: 0.6; cursor: default; }
+
+/* Cart */
+.cart-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+.cart-row-name { flex: 1; font-weight: 600; font-size: 0.9rem; }
+.cart-row input {
+  width: 50px;
+  text-align: center;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 6px;
+}
+.cart-row-price { width: 70px; text-align: right; font-weight: 700; color: var(--bimbo-red); }
+.cart-row-remove { border: none; background: none; color: #bbb; font-size: 1rem; cursor: pointer; }
+.cart-row-remove:hover { color: var(--bimbo-red); }
+
+.cart-total {
+  text-align: right;
+  font-weight: 800;
+  color: var(--bimbo-blue);
+  font-size: 1.1rem;
+  margin: 14px 0;
+}
+
+.form-field {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 10px;
+  color: #666;
+}
+
+.confirm-state {
+  text-align: center;
+  padding: 20px 10px;
+}
+.confirm-state h3 { color: var(--bimbo-blue); }
+
+.error-text { color: var(--bimbo-red); font-size: 0.85rem; margin: -4px 0 10px; }
+.hint-text { color: #999; font-size: 0.75rem; margin-top: 10px; text-align: center; }
