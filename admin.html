@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Panel de pedidos — Catálogo Bimbo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css?v=4" />
+</head>
+<body>
+
+  <!-- Login -->
+  <div id="loginView" class="admin-login-screen">
+    <div class="login-card">
+      <span class="hero-eyebrow">Panel Bimbo</span>
+      <h1 class="login-title">Acceso admin</h1>
+      <input class="form-field" id="loginEmail" type="email" placeholder="Correo" autocomplete="username" />
+      <input class="form-field" id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password" />
+      <p id="loginError" class="error-text hidden"></p>
+      <button class="btn-primary" id="loginBtn">Entrar</button>
+      <p class="hint-text"><a href="index.html">← Volver al catálogo</a></p>
+    </div>
+  </div>
+
+  <!-- Panel -->
+  <div id="ordersView" class="hidden">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <span class="brand">Panel <strong>Bimbo</strong></span>
+        <button id="logoutBtn" class="cart-btn">Salir</button>
+      </div>
+    </header>
+    <main class="view">
+      <div id="newOrderBanner" class="new-order-banner hidden">Nuevo pedido recibido</div>
+      <div class="orders-toolbar">
+        <h1 class="orders-title">Pedidos</h1>
+        <div class="orders-filter" id="ordersFilter">
+          <button class="chip active" data-estado="todos">Todos</button>
+          <button class="chip" data-estado="nuevo">Nuevos</button>
+          <button class="chip" data-estado="visto">Vistos</button>
+          <button class="chip" data-estado="completado">Completados</button>
+        </div>
+      </div>
+      <div id="ordersWrap"></div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="config.js?v=4"></script>
+  <script src="admin.js?v=4"></script>
+</body>
+</html>

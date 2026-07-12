@@ -1,15 +1,32 @@
 # Catálogo Bimbo
 
-Catálogo web público de productos Bimbo. App estática de un solo archivo
-(sin build, sin npm) — mismo patrón que Bimbo Inventory Pro: `index.html` +
-`app.js` + `styles.css`, fácil de editar y hostear en cualquier lado.
+Catálogo web público de productos Bimbo. App estática (sin build, sin npm):
+`index.html` (catálogo) + `admin.html` (panel de pedidos) + `config.js` +
+`app.js` + `admin.js` + `styles.css`.
 
-El cliente navega productos por categoría, busca, arma un pedido (carrito
-simple) y lo envía por **WhatsApp** y **correo** (vía EmailJS, sin backend
-propio). Los productos son datos de ejemplo en `app.js` (arreglo `PRODUCTOS`)
-— reemplázalos cuando conectes Supabase.
+El cliente navega productos, arma un pedido y lo envía por **WhatsApp**,
+**correo** (EmailJS) y queda guardado en **Supabase** para que tú, como
+admin, lo veas en `admin.html` con notificación en tiempo real (sonido +
+aviso en pantalla + título de la pestaña) apenas entra.
 
-## 1. Configurar (edita el bloque `CONFIG` en `app.js`)
+## 1. Proyecto de Supabase
+
+Ya está creado y conectado en `config.js` — proyecto **catalogo-bimbo**
+(separado del de Bimbo Inventory Pro), con la tabla `pedidos` y RLS:
+cualquiera puede crear un pedido (insert), pero solo un admin con sesión
+iniciada puede ver o actualizar pedidos (select/update).
+
+### Crear tu usuario admin
+
+1. Entra a [supabase.com/dashboard](https://supabase.com/dashboard) → proyecto
+   **catalogo-bimbo** → **Authentication → Users → Add user**.
+2. Pon tu correo y una contraseña, y marca **Auto Confirm User** (para no
+   depender de un correo de verificación).
+3. Con ese correo/contraseña entras en `admin.html`.
+
+## 2. Configurar WhatsApp / EmailJS (opcional)
+
+Edita el bloque `CONFIG` en `config.js`:
 
 ```js
 const CONFIG = {
@@ -18,51 +35,45 @@ const CONFIG = {
   EMAILJS_SERVICE_ID: '...',
   EMAILJS_TEMPLATE_ID: '...',
   ORDER_EMAIL_TO: 'tu-correo@ejemplo.com',
+  // SUPABASE_URL / SUPABASE_ANON_KEY ya están configurados
 };
 ```
 
-### EmailJS (para que el pedido te llegue por correo)
+Si dejas EmailJS vacío, el pedido igual queda guardado en Supabase y se
+abre WhatsApp — nada se rompe.
 
-1. Crea una cuenta gratis en [emailjs.com](https://www.emailjs.com) (200
-   correos/mes gratis).
-2. Agrega un **Email Service** (ej. conecta tu Gmail).
-3. Crea una **Email Template** con variables: `to_email`, `cliente_nombre`,
-   `cliente_telefono`, `cliente_direccion`, `cliente_notas`,
-   `pedido_detalle`, `pedido_total`.
-4. Copia el Public Key (Account → API Keys), el Service ID y el Template ID
-   a `CONFIG` en `app.js`.
+## 3. Probar en local
 
-Si dejas estos campos vacíos, el correo simplemente no se envía, pero el
-pedido igual se abre en WhatsApp — nada se rompe.
-
-## 2. Probar en local
-
-Solo abre `index.html` en el navegador, o sirve la carpeta con cualquier
-servidor estático:
+Abre `index.html` para el catálogo, o sirve la carpeta:
 
 ```bash
 npx serve .
 ```
 
-## 3. Hostear / publicar
+Panel de pedidos: abre `admin.html` (o el link "Acceso admin" al pie del
+catálogo) e inicia sesión con tu usuario admin.
 
-Cualquier hosting estático sirve: GitHub Pages, Vercel (como proyecto
-estático), Netlify, etc. No requiere build ni servidor.
+## 4. Hostear / publicar
 
-## 4. Estructura
+Cualquier hosting estático sirve: GitHub Pages, Vercel (proyecto estático),
+Netlify, etc. No requiere build ni servidor.
+
+## 5. Estructura
 
 ```
-index.html   ← estructura de la página y modales
-styles.css   ← estilos con los colores de marca Bimbo
-app.js       ← productos, carrito, checkout, envío (WhatsApp + EmailJS)
+index.html    ← catálogo público
+admin.html    ← panel de pedidos (requiere login)
+config.js     ← configuración compartida (WhatsApp, EmailJS, Supabase)
+app.js        ← lógica del catálogo/carrito/checkout
+admin.js      ← login, lista de pedidos, notificación en tiempo real
+styles.css    ← estilos (colores de marca Bimbo)
 ```
 
-## 5. Siguientes pasos
+## 6. Siguientes pasos
 
-- **Conectar Supabase**: reemplazar el arreglo `PRODUCTOS` en `app.js` por
-  una consulta a las tablas `categories`/`products` (mismo proyecto que el
-  admin-dashboard / Bimbo Inventory Pro), usando el cliente `supabase-js`
-  vía CDN igual que se hizo ahí.
-- **Fotos reales**: cambiar los bloques de color por `<img>` apuntando a
+- **Fotos reales**: cambiar los íconos/gradientes por `<img>` apuntando a
   Supabase Storage cuando tengas las imágenes.
-- Paginación / más categorías si el catálogo crece.
+- **Productos desde Supabase**: reemplazar el arreglo `PRODUCTOS` en
+  `app.js` por una tabla `productos` en el mismo proyecto, para editarlos
+  sin tocar código.
+- Exportar pedidos a CSV/WhatsApp consolidado desde el panel admin.

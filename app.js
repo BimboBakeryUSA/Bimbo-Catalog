@@ -1,39 +1,42 @@
 // ============================================================
-// CONFIGURACIÓN — edita estos valores con los tuyos.
+// VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
+// página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
+const VERSION = 'v3 — pedidos guardados + notificación admin';
 
-const CONFIG = {
-  // Número de WhatsApp donde llegarán los pedidos (formato internacional,
-  // solo dígitos, sin espacios ni signos). Ej: 5215512345678
-  WHATSAPP_NUMBER: '5210000000000',
-
-  // EmailJS (https://www.emailjs.com) — plan gratis, sin backend propio.
-  // Crea una cuenta, un "Email Service" y una plantilla, y pon aquí tus IDs.
-  EMAILJS_PUBLIC_KEY: '',
-  EMAILJS_SERVICE_ID: '',
-  EMAILJS_TEMPLATE_ID: '',
-  ORDER_EMAIL_TO: 'tu-correo@ejemplo.com',
-};
+// CONFIG y supabaseClient vienen de config.js (compartido con admin.js)
 
 // ============================================================
 // DATOS DE PRODUCTOS (de ejemplo — luego se puede conectar a Supabase)
 // ============================================================
 const PRODUCTOS = [
-  { slug: 'pan-blanco-grande', nombre: 'Pan Blanco Grande', categoria: 'Pan de caja', precio: 42.5, descripcion: 'El clásico pan blanco Bimbo, suave y esponjoso, ideal para toda la familia.', color: '#F4E7D3' },
-  { slug: 'pan-integral', nombre: 'Pan Integral', categoria: 'Pan de caja', precio: 46.0, descripcion: 'Pan 100% integral, fuente de fibra, para un estilo de vida saludable.', color: '#D9C7A3' },
-  { slug: 'bimbollos', nombre: 'Bimbollos', categoria: 'Pan dulce', precio: 38.0, descripcion: 'Bollos suaves rellenos de crema, perfectos para acompañar tu café.', color: '#F7D9C4' },
-  { slug: 'panque-bimbo', nombre: 'Panqué Bimbo', categoria: 'Pan dulce', precio: 34.5, descripcion: 'Panqué esponjoso, ideal para el desayuno o la merienda.', color: '#F1E2A8' },
-  { slug: 'donas-bimbo', nombre: 'Donas Bimbo', categoria: 'Pan dulce', precio: 36.0, descripcion: 'Donas glaseadas, suaves y deliciosas, un clásico de siempre.', color: '#F0C9D1' },
-  { slug: 'tostado-bimbo', nombre: 'Pan Tostado', categoria: 'Pan de caja', precio: 32.0, descripcion: 'Pan tostado crujiente, perfecto para tus tostadas de la mañana.', color: '#E8D4B0' },
-  { slug: 'tortillas-de-harina', nombre: 'Tortillas de Harina', categoria: 'Tortillas', precio: 28.5, descripcion: 'Tortillas de harina suaves, listas para tacos, quesadillas y más.', color: '#EFE3C8' },
-  { slug: 'barritas-de-fresa', nombre: 'Barritas de Fresa', categoria: 'Repostería', precio: 30.0, descripcion: 'Barritas rellenas de mermelada de fresa con un toque crujiente.', color: '#F3C6C6' },
+  { slug: 'pan-blanco-grande', nombre: 'Pan Blanco Grande', categoria: 'Pan de caja', precio: 42.5, descripcion: 'El clásico pan blanco Bimbo, suave y esponjoso, ideal para toda la familia.', color: '#FBEFD9' },
+  { slug: 'pan-integral', nombre: 'Pan Integral', categoria: 'Pan de caja', precio: 46.0, descripcion: 'Pan 100% integral, fuente de fibra, para un estilo de vida saludable.', color: '#F0E4CB' },
+  { slug: 'bimbollos', nombre: 'Bimbollos', categoria: 'Pan dulce', precio: 38.0, descripcion: 'Bollos suaves rellenos de crema, perfectos para acompañar tu café.', color: '#FCE9DE' },
+  { slug: 'panque-bimbo', nombre: 'Panqué Bimbo', categoria: 'Pan dulce', precio: 34.5, descripcion: 'Panqué esponjoso, ideal para el desayuno o la merienda.', color: '#FBF0D3' },
+  { slug: 'donas-bimbo', nombre: 'Donas Bimbo', categoria: 'Pan dulce', precio: 36.0, descripcion: 'Donas glaseadas, suaves y deliciosas, un clásico de siempre.', color: '#FBE4E9' },
+  { slug: 'tostado-bimbo', nombre: 'Pan Tostado', categoria: 'Pan de caja', precio: 32.0, descripcion: 'Pan tostado crujiente, perfecto para tus tostadas de la mañana.', color: '#F4E6CE' },
+  { slug: 'tortillas-de-harina', nombre: 'Tortillas de Harina', categoria: 'Tortillas', precio: 28.5, descripcion: 'Tortillas de harina suaves, listas para tacos, quesadillas y más.', color: '#F8EFDA' },
+  { slug: 'barritas-de-fresa', nombre: 'Barritas de Fresa', categoria: 'Repostería', precio: 30.0, descripcion: 'Barritas rellenas de mermelada de fresa con un toque crujiente.', color: '#FBDFE2' },
 ];
+
+// Ícono representativo por categoría (mientras no hay fotos reales).
+const ICONOS_CATEGORIA = {
+  'Pan de caja': '🍞',
+  'Pan dulce': '🥐',
+  'Tortillas': '🫓',
+  'Repostería': '🍰',
+};
 
 const STORAGE_KEY = 'catalogo-bimbo-carrito';
 
 // ============================================================
-// ESTADO DEL CARRITO (persistido en localStorage)
+// ESTADO
 // ============================================================
+let carrito = cargarCarrito();
+let categoriaActiva = 'Todas';
+let textoBusqueda = '';
+
 function cargarCarrito() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
@@ -44,8 +47,6 @@ function cargarCarrito() {
 function guardarCarrito(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
-
-let carrito = cargarCarrito();
 
 function agregarAlCarrito(slug, cantidad = 1) {
   const producto = PRODUCTOS.find((p) => p.slug === slug);
@@ -85,7 +86,6 @@ function vaciarCarrito() {
 function totalCarrito() {
   return carrito.reduce((acc, i) => acc + i.precio * i.cantidad, 0);
 }
-
 function totalItemsCarrito() {
   return carrito.reduce((acc, i) => acc + i.cantidad, 0);
 }
@@ -98,20 +98,43 @@ function actualizarBadge() {
 }
 
 // ============================================================
-// RENDER: CATÁLOGO
+// RENDER: CHIPS DE CATEGORÍA
 // ============================================================
 function getCategorias() {
   return [...new Set(PRODUCTOS.map((p) => p.categoria))];
 }
 
-function renderCatalogo(filtro = '') {
+function renderChips() {
+  const wrap = document.getElementById('chipsWrap');
+  const categorias = ['Todas', ...getCategorias()];
+  wrap.innerHTML = categorias
+    .map(
+      (cat) =>
+        `<button class="chip${cat === categoriaActiva ? ' active' : ''}" data-cat="${cat}">${cat}</button>`
+    )
+    .join('');
+  wrap.querySelectorAll('.chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      categoriaActiva = btn.dataset.cat;
+      renderChips();
+      renderCatalogo();
+    });
+  });
+}
+
+// ============================================================
+// RENDER: CATÁLOGO
+// ============================================================
+function renderCatalogo() {
   const wrap = document.getElementById('categoriesWrap');
   wrap.innerHTML = '';
-  const texto = filtro.trim().toLowerCase();
+  const texto = textoBusqueda.trim().toLowerCase();
 
-  const productosFiltrados = PRODUCTOS.filter((p) =>
-    p.nombre.toLowerCase().includes(texto)
-  );
+  const productosFiltrados = PRODUCTOS.filter((p) => {
+    const coincideTexto = p.nombre.toLowerCase().includes(texto);
+    const coincideCategoria = categoriaActiva === 'Todas' || p.categoria === categoriaActiva;
+    return coincideTexto && coincideCategoria;
+  });
 
   getCategorias().forEach((categoria) => {
     const productosCategoria = productosFiltrados.filter((p) => p.categoria === categoria);
@@ -125,10 +148,7 @@ function renderCatalogo(filtro = '') {
 
     const grid = document.createElement('div');
     grid.className = 'grid';
-
-    productosCategoria.forEach((producto) => {
-      grid.appendChild(crearTarjetaProducto(producto));
-    });
+    productosCategoria.forEach((producto) => grid.appendChild(crearTarjetaProducto(producto)));
 
     section.appendChild(grid);
     wrap.appendChild(section);
@@ -145,8 +165,8 @@ function crearTarjetaProducto(producto) {
 
   const image = document.createElement('div');
   image.className = 'card-image';
-  image.style.backgroundColor = producto.color;
-  image.textContent = producto.nombre;
+  image.style.background = `linear-gradient(135deg, ${producto.color}, #ffffff)`;
+  image.innerHTML = `<span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span>`;
   image.onclick = () => abrirDetalleProducto(producto.slug);
 
   const body = document.createElement('div');
@@ -160,11 +180,11 @@ function crearTarjetaProducto(producto) {
 
   const btn = document.createElement('button');
   btn.className = 'card-add';
-  btn.textContent = 'Agregar al pedido';
+  btn.textContent = 'Agregar';
   btn.onclick = () => {
     agregarAlCarrito(producto.slug);
     btn.textContent = '¡Agregado!';
-    setTimeout(() => (btn.textContent = 'Agregar al pedido'), 1200);
+    setTimeout(() => (btn.textContent = 'Agregar'), 1200);
   };
   body.appendChild(btn);
 
@@ -182,7 +202,9 @@ function abrirDetalleProducto(slug) {
 
   const body = document.getElementById('productModalBody');
   body.innerHTML = `
-    <div class="detail-image" style="background-color:${producto.color}">${producto.nombre}</div>
+    <div class="detail-image" style="background:linear-gradient(135deg, ${producto.color}, #ffffff)">
+      <span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span>
+    </div>
     <span class="detail-category">${producto.categoria}</span>
     <h2 class="detail-name">${producto.nombre}</h2>
     <p class="detail-desc">${producto.descripcion}</p>
@@ -213,7 +235,11 @@ function renderCartModal() {
       (item) => `
       <div class="cart-row" data-slug="${item.slug}">
         <span class="cart-row-name">${item.nombre}</span>
-        <input type="number" min="1" value="${item.cantidad}" data-qty="${item.slug}" />
+        <div class="qty-stepper">
+          <button data-dec="${item.slug}">−</button>
+          <span>${item.cantidad}</span>
+          <button data-inc="${item.slug}">+</button>
+        </div>
         <span class="cart-row-price">$${(item.precio * item.cantidad).toFixed(2)}</span>
         <button class="cart-row-remove" data-remove="${item.slug}">✕</button>
       </div>`
@@ -223,7 +249,7 @@ function renderCartModal() {
   body.innerHTML = `
     <h2>Tu pedido</h2>
     ${filas}
-    <div class="cart-total">Total: $${totalCarrito().toFixed(2)}</div>
+    <div class="cart-total"><span>Total</span><strong>$${totalCarrito().toFixed(2)}</strong></div>
     <div id="checkoutFormWrap">
       <input class="form-field" id="inputNombre" placeholder="Nombre completo" />
       <input class="form-field" id="inputTelefono" placeholder="Teléfono" />
@@ -235,9 +261,18 @@ function renderCartModal() {
     </div>
   `;
 
-  body.querySelectorAll('[data-qty]').forEach((input) => {
-    input.addEventListener('change', (e) => {
-      cambiarCantidad(e.target.dataset.qty, Number(e.target.value));
+  body.querySelectorAll('[data-inc]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const slug = e.target.dataset.inc;
+      const item = carrito.find((i) => i.slug === slug);
+      cambiarCantidad(slug, item.cantidad + 1);
+    });
+  });
+  body.querySelectorAll('[data-dec]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const slug = e.target.dataset.dec;
+      const item = carrito.find((i) => i.slug === slug);
+      cambiarCantidad(slug, item.cantidad - 1);
     });
   });
   body.querySelectorAll('[data-remove]').forEach((btn) => {
@@ -281,7 +316,24 @@ async function enviarPedido() {
   const cliente = { nombre, telefono, direccion, notas };
   const mensaje = construirMensajePedido(cliente);
 
-  // 1) Intentar enviar el correo por EmailJS (si está configurado)
+  // 0) Guardar el pedido en Supabase (para que el admin lo vea y reciba
+  // notificación en tiempo real desde admin.html)
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from('pedidos').insert({
+        cliente_nombre: nombre,
+        cliente_telefono: telefono,
+        cliente_direccion: direccion || null,
+        cliente_notas: notas || null,
+        items: carrito,
+        total: totalCarrito(),
+      });
+    } catch (err) {
+      console.error('Error guardando pedido en Supabase:', err);
+      // seguimos: igual mandamos correo/WhatsApp aunque falle el guardado
+    }
+  }
+
   if (CONFIG.EMAILJS_PUBLIC_KEY && CONFIG.EMAILJS_SERVICE_ID && CONFIG.EMAILJS_TEMPLATE_ID) {
     try {
       emailjs.init(CONFIG.EMAILJS_PUBLIC_KEY);
@@ -296,11 +348,9 @@ async function enviarPedido() {
       });
     } catch (err) {
       console.error('Error enviando correo (EmailJS):', err);
-      // seguimos: igual abrimos WhatsApp
     }
   }
 
-  // 2) Abrir WhatsApp con el pedido prellenado
   if (CONFIG.WHATSAPP_NUMBER) {
     const url = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(mensaje)}`;
     window.open(url, '_blank');
@@ -314,6 +364,7 @@ function mostrarConfirmacion() {
   const body = document.getElementById('cartModalBody');
   body.innerHTML = `
     <div class="confirm-state">
+      <div class="confirm-icon">✓</div>
       <h3>¡Gracias! Tu pedido fue enviado.</h3>
       <p>Nos pondremos en contacto contigo pronto.</p>
       <button class="btn-primary" data-close="cartModal">Seguir viendo el catálogo</button>
@@ -323,7 +374,7 @@ function mostrarConfirmacion() {
 }
 
 // ============================================================
-// MODALES (abrir/cerrar genérico)
+// MODALES
 // ============================================================
 function abrirModal(id) {
   document.getElementById(id).classList.remove('hidden');
@@ -336,11 +387,14 @@ function cerrarModal(id) {
 // INICIALIZACIÓN
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
+  alert(`Catálogo Bimbo — ${VERSION}`);
+  renderChips();
   renderCatalogo();
   actualizarBadge();
 
   document.getElementById('searchInput').addEventListener('input', (e) => {
-    renderCatalogo(e.target.value);
+    textoBusqueda = e.target.value;
+    renderCatalogo();
   });
 
   document.getElementById('cartBtn').addEventListener('click', () => {
@@ -352,7 +406,6 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => cerrarModal(btn.dataset.close));
   });
 
-  // cerrar modal si se toca fuera de la tarjeta
   document.querySelectorAll('.modal').forEach((modal) => {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) modal.classList.add('hidden');
