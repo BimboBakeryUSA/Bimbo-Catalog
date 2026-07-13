@@ -340,9 +340,46 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 }
 .detail-image .icon { font-size: 4rem; }
 .detail-category { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 700; }
-.detail-name { font-size: 1.35rem; font-weight: 800; margin: 8px 0 10px; }
-.detail-desc { color: var(--ink-soft); margin-bottom: 16px; line-height: 1.5; font-size: 0.92rem; }
-.detail-price { font-size: 1.7rem; font-weight: 800; color: var(--ink); margin-bottom: 20px; }
+.detail-name { font-size: 1.35rem; font-weight: 800; margin: 8px 0 0; }
+.detail-desc { color: var(--ink-soft); margin: 10px 0 16px; line-height: 1.5; font-size: 0.92rem; }
+
+.detail-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.detail-price { font-size: 1.5rem; font-weight: 800; color: var(--ink); white-space: nowrap; margin: 8px 0 0; }
+
+/* Código de barras escaneable */
+.detail-barcode-wrap {
+  display: flex;
+  justify-content: center;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 14px 10px 10px;
+  margin: 12px 0 16px;
+}
+.detail-barcode-wrap svg { max-width: 100%; height: auto; }
+
+/* Datasheet de unidades (caja / tarima) */
+.detail-datasheet {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.datasheet-cell {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 6px;
+  text-align: center;
+  background: var(--surface);
+}
+.datasheet-icon { display: block; font-size: 1.3rem; margin-bottom: 4px; }
+.datasheet-value { display: block; font-weight: 800; font-size: 1.05rem; color: var(--ink); }
+.datasheet-label { display: block; font-size: 0.65rem; color: var(--ink-soft); margin-top: 2px; line-height: 1.2; }
 
 .btn-primary {
   width: 100%;

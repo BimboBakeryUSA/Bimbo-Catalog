@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v13 — UPC completo de 12 dígitos visible por producto';
+const VERSION = 'v14 — categorías por marca, código de barras y datasheet en detalle';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -227,12 +227,22 @@ function colorParaProducto(upc) {
   return PALETA_COLORES[hash % PALETA_COLORES.length];
 }
 
-// Categoría fija por ahora: la tabla compartida no tiene columna de
-// categoría todavía. Se puede agregar más adelante si hace falta agrupar.
-const CATEGORIA_DEFAULT = 'Productos Bimbo';
+// Categoría = marca del producto (Barcel, Bimbo, Marinela, Entenmann's).
+// Los pocos productos sin marca asignada caen en el genérico de abajo.
+const MARCA_DISPLAY = {
+  BARCEL: 'Barcel',
+  BIMBO: 'Bimbo',
+  MARINELA: 'Marinela',
+  ENTENMANNS: "Entenmann's",
+};
+const CATEGORIA_DEFAULT = 'Otros productos Bimbo';
 
-// Ícono representativo (mientras no hay fotos reales).
+// Ícono representativo por marca (mientras no hay fotos reales).
 const ICONOS_CATEGORIA = {
+  Barcel: '🌶️',
+  Bimbo: '🍞',
+  Marinela: '🧁',
+  "Entenmann's": '🍩',
   [CATEGORIA_DEFAULT]: '🍞',
 };
 
@@ -290,19 +300,16 @@ function formatearUPC(upc12) {
 }
 
 function mapProductoDB(row) {
-  const detalles = [];
-  if (row.unidades_caja) detalles.push(`${row.unidades_caja} pzas por caja`);
-  if (row.unidades_pallet) detalles.push(`${row.unidades_pallet} por tarima`);
-
   return {
     slug: row.upc,
     nombre: row.producto,
-    categoria: CATEGORIA_DEFAULT,
+    categoria: MARCA_DISPLAY[row.marca] || CATEGORIA_DEFAULT,
     precio: row.precio != null ? Number(row.precio) : null,
-    descripcion: detalles.length ? detalles.join(' · ') : 'Sin detalles adicionales.',
     foto: row.foto || '',
     color: colorParaProducto(row.upc),
     upcCompleto: calcularUpcCompleto(row.upc, row.marca),
+    unidadesCaja: row.unidades_caja || null,
+    unidadesPallet: row.unidades_pallet || null,
   };
 }
 
@@ -517,20 +524,70 @@ function abrirDetalleProducto(slug) {
     ? `<div class="detail-image"><img src="${producto.foto}" alt="${producto.nombre}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></div>`
     : `<div class="detail-image" style="background:linear-gradient(135deg, ${producto.color}, #ffffff)"><span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span></div>`;
 
-  const upcHtml = producto.upcCompleto
-    ? `<p class="detail-upc" style="font-family:monospace;letter-spacing:1px;color:#8a7a63;font-size:14px;">UPC: ${formatearUPC(producto.upcCompleto)}</p>`
+  // Código de barras escaneable (UPC-A de 12 dígitos), para que el cliente
+  // pueda escanearlo directo en su tienda. Se dibuja con JsBarcode después
+  // de insertar el HTML (necesita que el <svg> ya exista en el DOM).
+  const barcodeHtml = producto.upcCompleto
+    ? `<div class="detail-barcode-wrap"><svg id="detailBarcode"></svg></div>`
     : '';
+
+  // "Datasheet" de unidades: piezas por caja, cajas por tarima y el total
+  // de piezas por tarima (calculado). Si no hay datos, no se muestra nada.
+  const uCaja = producto.unidadesCaja;
+  const cPallet = producto.unidadesPallet;
+  const datasheetHtml =
+    uCaja || cPallet
+      ? `
+    <div class="detail-datasheet">
+      <div class="datasheet-cell">
+        <span class="datasheet-icon">📦</span>
+        <span class="datasheet-value">${uCaja ?? '—'}</span>
+        <span class="datasheet-label">Piezas<br>por caja</span>
+      </div>
+      <div class="datasheet-cell">
+        <span class="datasheet-icon">🧱</span>
+        <span class="datasheet-value">${cPallet ?? '—'}</span>
+        <span class="datasheet-label">Cajas<br>por tarima</span>
+      </div>
+      <div class="datasheet-cell">
+        <span class="datasheet-icon">🏗️</span>
+        <span class="datasheet-value">${uCaja && cPallet ? uCaja * cPallet : '—'}</span>
+        <span class="datasheet-label">Piezas<br>por tarima</span>
+      </div>
+    </div>
+  `
+      : '';
 
   const body = document.getElementById('productModalBody');
   body.innerHTML = `
     ${imagenHtml}
-    <span class="detail-category">${producto.categoria}</span>
-    <h2 class="detail-name">${producto.nombre}</h2>
-    <p class="detail-desc">${producto.descripcion}</p>
-    ${upcHtml}
-    <p class="detail-price">$${producto.precio.toFixed(2)}</p>
+    <div class="detail-header-row">
+      <div>
+        <span class="detail-category">${producto.categoria}</span>
+        <h2 class="detail-name">${producto.nombre}</h2>
+      </div>
+      <p class="detail-price">$${producto.precio.toFixed(2)}</p>
+    </div>
+    ${barcodeHtml}
+    ${datasheetHtml}
     <button class="btn-primary" id="detailAddBtn">Agregar al pedido</button>
   `;
+
+  if (producto.upcCompleto && window.JsBarcode) {
+    try {
+      JsBarcode('#detailBarcode', producto.upcCompleto, {
+        format: 'upc',
+        displayValue: true,
+        fontSize: 14,
+        height: 55,
+        margin: 8,
+        width: 2,
+      });
+    } catch (err) {
+      console.error('Error generando código de barras:', err);
+    }
+  }
+
   document.getElementById('detailAddBtn').onclick = (e) => {
     agregarAlCarrito(producto.slug);
     e.target.textContent = '¡Agregado!';
