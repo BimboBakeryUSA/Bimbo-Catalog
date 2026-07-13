@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v15 — perfil editable, estado de pedido, precio destacado y orden por ventas';
+const VERSION = 'v16 — corrección: se vende por caja (precio × piezas), no por pieza suelta';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -300,15 +300,28 @@ function formatearUPC(upc12) {
 }
 
 function mapProductoDB(row) {
+  const unidadesCaja = row.unidades_caja || null;
+  // El precio en la base es POR PIEZA (así viene del price list). Lo que
+  // realmente se vende es la CAJA completa, así que si ya sabemos cuántas
+  // piezas trae la caja, el precio de venta es precio_pieza × piezas.
+  // Mientras no tengamos ese dato para un producto (Doug lo sigue
+  // completando), se sigue vendiendo por pieza como antes — para no
+  // inventar una cantidad de caja que no hemos verificado.
+  const precioUnidad = row.precio != null ? Number(row.precio) : null;
+  const ventaPorCaja = !!unidadesCaja;
+  const precio = precioUnidad != null ? (ventaPorCaja ? precioUnidad * unidadesCaja : precioUnidad) : null;
+
   return {
     slug: row.upc,
     nombre: row.producto,
     categoria: MARCA_DISPLAY[row.marca] || CATEGORIA_DEFAULT,
-    precio: row.precio != null ? Number(row.precio) : null,
+    precioUnidad,
+    precio,
+    ventaPorCaja,
     foto: row.foto || '',
     color: colorParaProducto(row.upc),
     upcCompleto: calcularUpcCompleto(row.upc, row.marca),
-    unidadesCaja: row.unidades_caja || null,
+    unidadesCaja,
     unidadesPallet: row.unidades_pallet || null,
     // Solo se usa para ordenar y para decidir "Hot" — nunca se muestra.
     ventasTotales: row.ventas_totales != null ? Number(row.ventas_totales) : 0,
@@ -396,7 +409,13 @@ function agregarAlCarrito(slug, cantidad = 1) {
   if (existente) {
     existente.cantidad += cantidad;
   } else {
-    carrito.push({ slug, nombre: producto.nombre, precio: producto.precio, cantidad });
+    carrito.push({
+      slug,
+      nombre: producto.nombre,
+      precio: producto.precio,
+      unidad: producto.ventaPorCaja ? 'caja' : 'pieza',
+      cantidad,
+    });
   }
   guardarCarrito(carrito);
   actualizarBadge();
@@ -518,12 +537,18 @@ function crearTarjetaProducto(producto) {
   }
   image.onclick = () => abrirDetalleProducto(producto.slug);
 
+  const unidadLabel = producto.ventaPorCaja ? `caja de ${producto.unidadesCaja}` : 'pieza';
   const body = document.createElement('div');
   body.className = 'card-body';
   body.innerHTML = `
     <span class="card-category">${producto.categoria}</span>
     <span class="card-name">${producto.nombre}</span>
-    <div class="card-price-row"><span class="card-price">$${producto.precio.toFixed(2)}</span></div>
+    <div class="card-price-row">
+      <div style="text-align:right;">
+        <span class="card-price">$${producto.precio.toFixed(2)}</span>
+        <span class="card-price-unit">${unidadLabel}</span>
+      </div>
+    </div>
   `;
   body.querySelector('.card-name').onclick = () => abrirDetalleProducto(producto.slug);
 
@@ -587,6 +612,10 @@ function abrirDetalleProducto(slug) {
   `
       : '';
 
+  const unidadLabelDetalle = producto.ventaPorCaja
+    ? `Precio por caja (${producto.unidadesCaja} pzas)`
+    : 'Precio por pieza';
+
   const body = document.getElementById('productModalBody');
   body.innerHTML = `
     ${imagenHtml}
@@ -596,7 +625,10 @@ function abrirDetalleProducto(slug) {
         ${producto.esHot ? '<span class="detail-hot-tag">🔥 Popular</span>' : ''}
         <h2 class="detail-name">${producto.nombre}</h2>
       </div>
-      <p class="detail-price">$${producto.precio.toFixed(2)}</p>
+      <div>
+        <p class="detail-price">$${producto.precio.toFixed(2)}</p>
+        <p class="detail-price-unit">${unidadLabelDetalle}</p>
+      </div>
     </div>
     ${barcodeHtml}
     ${datasheetHtml}
@@ -641,7 +673,7 @@ function renderCartModal() {
     .map(
       (item) => `
       <div class="cart-row" data-slug="${item.slug}">
-        <span class="cart-row-name">${item.nombre}</span>
+        <span class="cart-row-name">${item.nombre}<br><small class="cart-row-unidad">${item.unidad === 'caja' ? 'Caja' : 'Pieza'}</small></span>
         <div class="qty-stepper">
           <button data-dec="${item.slug}">−</button>
           <span>${item.cantidad}</span>
@@ -707,7 +739,7 @@ function construirMensajePedido(cliente) {
     `Dirección: ${cliente.direccion}, ${cliente.ciudad}, ${cliente.estado} ${cliente.zip}`,
     cliente.notas ? `Notas: ${cliente.notas}` : null,
     '',
-    ...carrito.map((i) => `• ${i.nombre} x${i.cantidad} - $${(i.precio * i.cantidad).toFixed(2)}`),
+    ...carrito.map((i) => `• ${i.nombre} x${i.cantidad} ${i.unidad === 'caja' ? 'caja(s)' : 'pieza(s)'} - $${(i.precio * i.cantidad).toFixed(2)}`),
     '',
     `Total: $${totalCarrito().toFixed(2)}`,
   ].filter(Boolean);

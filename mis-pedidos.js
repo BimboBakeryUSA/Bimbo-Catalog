@@ -76,7 +76,10 @@ function tarjetaMiPedido(pedido) {
     timeStyle: 'short',
   });
   const items = (pedido.items || [])
-    .map((i) => `<div><span>${i.nombre} x${i.cantidad}</span><span>$${(i.precio * i.cantidad).toFixed(2)}</span></div>`)
+    .map(
+      (i) =>
+        `<div><span>${i.nombre} x${i.cantidad} ${i.unidad === 'caja' ? 'caja(s)' : i.unidad === 'pieza' ? 'pieza(s)' : ''}</span><span>$${(i.precio * i.cantidad).toFixed(2)}</span></div>`
+    )
     .join('');
 
   return `

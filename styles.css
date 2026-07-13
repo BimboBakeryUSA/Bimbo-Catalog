@@ -285,6 +285,14 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   padding: 5px 12px;
   border-radius: 999px;
 }
+.card-price-unit {
+  display: block;
+  text-align: right;
+  font-size: 0.62rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+  margin-top: 3px;
+}
 .card-add {
   border: none;
   background: var(--surface);
@@ -381,6 +389,13 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   padding: 6px 14px;
   border-radius: 999px;
 }
+.detail-price-unit {
+  text-align: right;
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+  margin: 4px 0 0;
+}
 
 /* Código de barras escaneable */
 .detail-barcode-wrap {
@@ -452,7 +467,8 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   padding: 12px 0;
   border-bottom: 1px solid var(--line);
 }
-.cart-row-name { flex: 1; font-weight: 700; font-size: 0.9rem; color: var(--ink); }
+.cart-row-name { flex: 1; font-weight: 700; font-size: 0.9rem; color: var(--ink); line-height: 1.4; }
+.cart-row-unidad { font-weight: 500; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
 .qty-stepper {
   display: flex;
   align-items: center;
