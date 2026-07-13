@@ -47,3 +47,11 @@ const ESTADOS_SERVICIO = [
   { valor: 'VA', nombre: 'Virginia' },
   { valor: 'DE', nombre: 'Delaware' },
 ];
+
+// Estados de un pedido, en lenguaje claro para mostrarle al cliente qué
+// está pasando con su pedido (lo usan admin.js y mis-pedidos.js).
+const ESTADO_PEDIDO_INFO = {
+  nuevo: { label: 'Recibido, en revisión', icon: '🕐' },
+  visto: { label: 'Confirmado, preparando tu pedido', icon: '👀' },
+  completado: { label: 'Completado', icon: '✅' },
+};

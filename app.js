@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v14 — categorías por marca, código de barras y datasheet en detalle';
+const VERSION = 'v15 — perfil editable, estado de pedido, precio destacado y orden por ventas';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -310,12 +310,37 @@ function mapProductoDB(row) {
     upcCompleto: calcularUpcCompleto(row.upc, row.marca),
     unidadesCaja: row.unidades_caja || null,
     unidadesPallet: row.unidades_pallet || null,
+    // Solo se usa para ordenar y para decidir "Hot" — nunca se muestra.
+    ventasTotales: row.ventas_totales != null ? Number(row.ventas_totales) : 0,
+    esHot: false,
   };
+}
+
+// Marca los 10 productos más vendidos DE CADA CATEGORÍA (marca) como
+// "Hot". Se calcula una sola vez al cargar, sobre el listado completo
+// (no sobre resultados de búsqueda), para que el badge no cambie según
+// lo que el cliente esté buscando.
+function marcarProductosHot(productos) {
+  const porCategoria = {};
+  productos.forEach((p) => {
+    if (!porCategoria[p.categoria]) porCategoria[p.categoria] = [];
+    porCategoria[p.categoria].push(p);
+  });
+  Object.values(porCategoria).forEach((grupo) => {
+    grupo
+      .slice()
+      .sort((a, b) => (b.ventasTotales || 0) - (a.ventasTotales || 0))
+      .slice(0, 10)
+      .forEach((p) => {
+        p.esHot = true;
+      });
+  });
 }
 
 // Trae los productos desde Supabase. Solo muestra productos con precio
 // asignado, para no exponerle "$0.00" a un cliente por algo que todavía
-// no tiene precio cargado.
+// no tiene precio cargado. Se ordenan por ventas totales (de mayor a
+// menor) para que lo más vendido aparezca primero en cada categoría.
 async function cargarProductos() {
   if (!productsSupabaseClient) {
     console.error('productsSupabaseClient no está configurado (revisa config.js)');
@@ -325,13 +350,14 @@ async function cargarProductos() {
     await cargarPrefijosMarca();
     const { data, error } = await productsSupabaseClient
       .from('products')
-      .select('upc, sku, producto, precio, unidades_caja, unidades_pallet, foto, activo, marca')
+      .select('upc, sku, producto, precio, unidades_caja, unidades_pallet, foto, activo, marca, ventas_totales')
       .eq('activo', true)
       .not('precio', 'is', null)
       .gt('precio', 0)
-      .order('producto');
+      .order('ventas_totales', { ascending: false, nullsFirst: false });
     if (error) throw error;
     PRODUCTOS = (data || []).map(mapProductoDB);
+    marcarProductosHot(PRODUCTOS);
     localStorage.setItem(PRODUCTOS_CACHE_KEY, JSON.stringify(PRODUCTOS));
   } catch (err) {
     console.error('Error cargando productos de Supabase, usando cache local:', err);
@@ -487,6 +513,9 @@ function crearTarjetaProducto(producto) {
     image.style.background = `linear-gradient(135deg, ${producto.color}, #ffffff)`;
     image.innerHTML = `<span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span>`;
   }
+  if (producto.esHot) {
+    image.innerHTML += `<span class="card-hot-badge">🔥 Hot</span>`;
+  }
   image.onclick = () => abrirDetalleProducto(producto.slug);
 
   const body = document.createElement('div');
@@ -494,7 +523,7 @@ function crearTarjetaProducto(producto) {
   body.innerHTML = `
     <span class="card-category">${producto.categoria}</span>
     <span class="card-name">${producto.nombre}</span>
-    <span class="card-price">$${producto.precio.toFixed(2)}</span>
+    <div class="card-price-row"><span class="card-price">$${producto.precio.toFixed(2)}</span></div>
   `;
   body.querySelector('.card-name').onclick = () => abrirDetalleProducto(producto.slug);
 
@@ -564,6 +593,7 @@ function abrirDetalleProducto(slug) {
     <div class="detail-header-row">
       <div>
         <span class="detail-category">${producto.categoria}</span>
+        ${producto.esHot ? '<span class="detail-hot-tag">🔥 Popular</span>' : ''}
         <h2 class="detail-name">${producto.nombre}</h2>
       </div>
       <p class="detail-price">$${producto.precio.toFixed(2)}</p>

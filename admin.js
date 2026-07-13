@@ -160,15 +160,16 @@ function renderPedidos() {
 }
 
 function tarjetaPedido(pedido) {
-  const expandido = pedido.estado !== 'completado' || pedidosExpandido.has(pedido.id);
+  const expandido = pedidosExpandido.has(pedido.id);
+  const info = ESTADO_PEDIDO_INFO[pedido.estado] || { label: pedido.estado, icon: '' };
 
   if (!expandido) {
     const fechaCorta = new Date(pedido.created_at).toLocaleDateString('es-MX', { dateStyle: 'medium' });
     return `
-      <div class="order-row-compact" data-expandir="${pedido.id}">
+      <div class="order-row-compact ${pedido.estado === 'nuevo' ? 'is-nuevo' : ''}" data-expandir="${pedido.id}">
         <span class="compact-nombre">${pedido.tienda_nombre || pedido.cliente_nombre}</span>
         <span class="compact-meta">${fechaCorta}</span>
-        <span class="order-badge completado">completado</span>
+        <span class="order-badge ${pedido.estado}">${info.icon} ${info.label}</span>
         <span class="compact-total">$${Number(pedido.total).toFixed(2)}</span>
       </div>
     `;
@@ -185,7 +186,7 @@ function tarjetaPedido(pedido) {
   const acciones = [];
   if (pedido.estado === 'nuevo') acciones.push(`<button data-id="${pedido.id}" data-marcar="visto">Marcar visto</button>`);
   if (pedido.estado !== 'completado') acciones.push(`<button data-id="${pedido.id}" data-marcar="completado">Marcar completado</button>`);
-  if (pedido.estado === 'completado') acciones.push(`<button data-expandir="${pedido.id}">Minimizar</button>`);
+  acciones.push(`<button data-expandir="${pedido.id}">Minimizar</button>`);
 
   return `
     <div class="order-card ${pedido.estado === 'nuevo' ? 'is-nuevo' : ''}">
@@ -195,7 +196,7 @@ function tarjetaPedido(pedido) {
           <div class="order-meta">${pedido.cliente_telefono}${pedido.cliente_email ? ' · ' + pedido.cliente_email : ''}</div>
           <div class="order-meta">${pedido.cliente_direccion || ''}${pedido.cliente_ciudad ? ', ' + pedido.cliente_ciudad : ''}${pedido.cliente_estado ? ', ' + pedido.cliente_estado : ''} ${pedido.cliente_zip || ''}</div>
           <div class="order-meta">${fecha}</div>
-          <span class="order-badge ${pedido.estado}">${pedido.estado}</span>
+          <span class="order-badge ${pedido.estado}">${info.icon} ${info.label}</span>
         </div>
         <div class="order-total">$${Number(pedido.total).toFixed(2)}</div>
       </div>

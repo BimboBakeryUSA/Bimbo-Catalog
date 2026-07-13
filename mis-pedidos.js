@@ -2,6 +2,7 @@
 // RLS ya filtra: cada quien ve solo lo suyo (o todo, si es admin).
 
 let misPedidos = [];
+let misPedidosExpandido = new Set();
 
 async function iniciar() {
   const { data } = await supabaseClient.auth.getSession();
@@ -43,9 +44,33 @@ function renderMisPedidos() {
   }
 
   wrap.innerHTML = misPedidos.map((pedido) => tarjetaMiPedido(pedido)).join('');
+
+  wrap.querySelectorAll('[data-expandir]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.expandir;
+      if (misPedidosExpandido.has(id)) misPedidosExpandido.delete(id);
+      else misPedidosExpandido.add(id);
+      renderMisPedidos();
+    });
+  });
 }
 
 function tarjetaMiPedido(pedido) {
+  const info = ESTADO_PEDIDO_INFO[pedido.estado] || { label: pedido.estado, icon: '' };
+  const expandido = misPedidosExpandido.has(pedido.id);
+
+  if (!expandido) {
+    const fechaCorta = new Date(pedido.created_at).toLocaleDateString('es-MX', { dateStyle: 'medium' });
+    return `
+      <div class="order-row-compact ${pedido.estado === 'nuevo' ? 'is-nuevo' : ''}" data-expandir="${pedido.id}">
+        <span class="compact-nombre">${pedido.tienda_nombre || pedido.cliente_nombre}</span>
+        <span class="compact-meta">${fechaCorta}</span>
+        <span class="order-badge ${pedido.estado}">${info.icon} ${info.label}</span>
+        <span class="compact-total">$${Number(pedido.total).toFixed(2)}</span>
+      </div>
+    `;
+  }
+
   const fecha = new Date(pedido.created_at).toLocaleString('es-MX', {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -61,11 +86,12 @@ function tarjetaMiPedido(pedido) {
           <div class="order-cliente">${pedido.tienda_nombre || pedido.cliente_nombre}</div>
           <div class="order-meta">${pedido.cliente_direccion || ''}${pedido.cliente_ciudad ? ', ' + pedido.cliente_ciudad : ''}${pedido.cliente_estado ? ', ' + pedido.cliente_estado : ''} ${pedido.cliente_zip || ''}</div>
           <div class="order-meta">${fecha}</div>
-          <span class="order-badge ${pedido.estado}">${pedido.estado}</span>
+          <span class="order-badge ${pedido.estado}">${info.icon} ${info.label}</span>
         </div>
         <div class="order-total">$${Number(pedido.total).toFixed(2)}</div>
       </div>
       <div class="order-items">${items}</div>
+      <div class="order-actions"><button data-expandir="${pedido.id}">Minimizar</button></div>
     </div>
   `;
 }
