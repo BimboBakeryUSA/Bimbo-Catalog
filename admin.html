@@ -49,6 +49,7 @@
         <button class="auth-tab" data-panel="usuarios">
           Usuarios <span id="pendientesBadge" class="cart-badge hidden" style="position:static; margin-left:4px;">0</span>
         </button>
+        <button class="auth-tab" data-panel="productos">Productos</button>
       </div>
 
       <div id="panelPedidos">
@@ -89,12 +90,23 @@
         </div>
         <div id="usuariosWrap"></div>
       </div>
+
+      <div id="panelProductos" class="hidden">
+        <div class="orders-toolbar">
+          <h1 class="orders-title">Productos</h1>
+        </div>
+        <div class="search-toolbar">
+          <input class="form-field" id="productosBusqueda" placeholder="Buscar por nombre o UPC..." />
+        </div>
+        <p class="hint-text">Edita precio, piezas por caja o cajas por tarima y da clic en Guardar. Los cambios se reflejan de inmediato en el catálogo.</p>
+        <div id="productosWrap"></div>
+      </div>
     </main>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="config.js?v=11"></script>
+  <script src="config.js?v=12"></script>
   <script src="profile-menu.js?v=11"></script>
-  <script src="admin.js?v=11"></script>
+  <script src="admin.js?v=12"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v12 — productos desde Supabase compartido con Inventory Pro';
+const VERSION = 'v13 — UPC completo de 12 dígitos visible por producto';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -236,6 +236,59 @@ const ICONOS_CATEGORIA = {
   [CATEGORIA_DEFAULT]: '🍞',
 };
 
+// ============================================================
+// UPC COMPLETO (12 dígitos) — el precio list solo trae el código
+// "core" de 10 dígitos (sin el primer dígito de marca ni el dígito
+// verificador). Reconstruimos el UPC-A real para que el cliente pueda
+// buscarlo/escanearlo en su tienda:
+//   [prefijo de marca (1)] + [core de 10] + [dígito verificador (1)]
+// El prefijo por marca viene de la tabla `marca_prefijos`. El dígito
+// verificador se calcula con el algoritmo estándar UPC-A/GS1.
+// ============================================================
+let PREFIJOS_MARCA = {};
+
+async function cargarPrefijosMarca() {
+  try {
+    const { data, error } = await productsSupabaseClient.from('marca_prefijos').select('marca, prefijo');
+    if (error) throw error;
+    PREFIJOS_MARCA = {};
+    (data || []).forEach((r) => {
+      PREFIJOS_MARCA[r.marca] = r.prefijo;
+    });
+  } catch (err) {
+    console.error('Error cargando marca_prefijos:', err);
+  }
+}
+
+function calcularDigitoVerificadorUPC(codigo11) {
+  let sumaImpares = 0;
+  let sumaPares = 0;
+  for (let i = 0; i < 11; i++) {
+    const d = Number(codigo11[i]);
+    if (i % 2 === 0) sumaImpares += d;
+    else sumaPares += d;
+  }
+  const total = sumaImpares * 3 + sumaPares;
+  return (10 - (total % 10)) % 10;
+}
+
+// Devuelve el UPC-A de 12 dígitos, o null si no conocemos el prefijo
+// de esa marca todavía.
+function calcularUpcCompleto(upcCore, marca) {
+  const prefijo = PREFIJOS_MARCA[marca];
+  if (!prefijo || !upcCore) return null;
+  const core10 = String(upcCore).padStart(10, '0').slice(-10);
+  const codigo11 = prefijo + core10;
+  const digitoVerificador = calcularDigitoVerificadorUPC(codigo11);
+  return codigo11 + String(digitoVerificador);
+}
+
+// Formato legible tipo barra de barcode: "0 74323 09524 1"
+function formatearUPC(upc12) {
+  if (!upc12 || upc12.length !== 12) return upc12 || '';
+  return `${upc12[0]} ${upc12.slice(1, 6)} ${upc12.slice(6, 11)} ${upc12[11]}`;
+}
+
 function mapProductoDB(row) {
   const detalles = [];
   if (row.unidades_caja) detalles.push(`${row.unidades_caja} pzas por caja`);
@@ -249,6 +302,7 @@ function mapProductoDB(row) {
     descripcion: detalles.length ? detalles.join(' · ') : 'Sin detalles adicionales.',
     foto: row.foto || '',
     color: colorParaProducto(row.upc),
+    upcCompleto: calcularUpcCompleto(row.upc, row.marca),
   };
 }
 
@@ -261,9 +315,10 @@ async function cargarProductos() {
     return;
   }
   try {
+    await cargarPrefijosMarca();
     const { data, error } = await productsSupabaseClient
       .from('products')
-      .select('upc, sku, producto, precio, unidades_caja, unidades_pallet, foto, activo')
+      .select('upc, sku, producto, precio, unidades_caja, unidades_pallet, foto, activo, marca')
       .eq('activo', true)
       .not('precio', 'is', null)
       .gt('precio', 0)
@@ -462,12 +517,17 @@ function abrirDetalleProducto(slug) {
     ? `<div class="detail-image"><img src="${producto.foto}" alt="${producto.nombre}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></div>`
     : `<div class="detail-image" style="background:linear-gradient(135deg, ${producto.color}, #ffffff)"><span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span></div>`;
 
+  const upcHtml = producto.upcCompleto
+    ? `<p class="detail-upc" style="font-family:monospace;letter-spacing:1px;color:#8a7a63;font-size:14px;">UPC: ${formatearUPC(producto.upcCompleto)}</p>`
+    : '';
+
   const body = document.getElementById('productModalBody');
   body.innerHTML = `
     ${imagenHtml}
     <span class="detail-category">${producto.categoria}</span>
     <h2 class="detail-name">${producto.nombre}</h2>
     <p class="detail-desc">${producto.descripcion}</p>
+    ${upcHtml}
     <p class="detail-price">$${producto.precio.toFixed(2)}</p>
     <button class="btn-primary" id="detailAddBtn">Agregar al pedido</button>
   `;

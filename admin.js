@@ -64,6 +64,7 @@ function mostrarPanel() {
   document.getElementById('ordersView').classList.remove('hidden');
   cargarPedidos();
   cargarUsuarios();
+  cargarProductosAdmin();
   suscribirseATiempoReal();
   suscribirseAUsuarios();
   initProfileMenu({ linkCatalogo: true, onLogout: cerrarSesion });
@@ -436,6 +437,154 @@ function cambiarPanelAdmin(panel) {
   document.querySelectorAll('.admin-tabs .auth-tab').forEach((btn) => btn.classList.toggle('active', btn.dataset.panel === panel));
   document.getElementById('panelPedidos').classList.toggle('hidden', panel !== 'pedidos');
   document.getElementById('panelUsuarios').classList.toggle('hidden', panel !== 'usuarios');
+  document.getElementById('panelProductos').classList.toggle('hidden', panel !== 'productos');
+}
+
+// ============================================================
+// PRODUCTOS (editar precio / unidades) — vía Edge Function segura
+// ============================================================
+// La tabla `products` vive en OTRO proyecto de Supabase (bimbo-inventory-pro,
+// compartido con la app de escaneo) y su RLS solo permite lectura pública.
+// Para poder editar precio/unidades desde aquí sin exponer una service role
+// key en el navegador, se llama a la función `admin-update-price` desplegada
+// en ese proyecto: ella valida que el usuario sea admin en ESTE proyecto
+// (catalogo-bimbo) y solo entonces hace el UPDATE con su propia service role.
+let productosAdmin = [];
+let busquedaProductosAdmin = '';
+
+async function cargarProductosAdmin() {
+  if (!productsSupabaseClient) {
+    console.error('productsSupabaseClient no está configurado (revisa config.js)');
+    return;
+  }
+  const { data, error } = await productsSupabaseClient
+    .from('products')
+    .select('upc, producto, precio, unidades_caja, unidades_pallet, marca, activo')
+    .order('producto');
+  if (error) {
+    console.error('Error cargando productos:', error);
+    return;
+  }
+  productosAdmin = data || [];
+  renderProductosAdmin();
+}
+
+function renderProductosAdmin() {
+  const wrap = document.getElementById('productosWrap');
+  const texto = busquedaProductosAdmin.trim().toLowerCase();
+
+  const filtrados = productosAdmin.filter((p) => {
+    if (!texto) return true;
+    return (p.producto || '').toLowerCase().includes(texto) || (p.upc || '').includes(texto);
+  });
+
+  if (filtrados.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">No hay productos con esta búsqueda.</p>';
+    return;
+  }
+
+  wrap.innerHTML = filtrados.map((p) => tarjetaProductoAdmin(p)).join('');
+
+  wrap.querySelectorAll('[data-guardar-producto]').forEach((btn) => {
+    btn.addEventListener('click', () => guardarProductoAdminClick(btn.dataset.guardarProducto));
+  });
+}
+
+function tarjetaProductoAdmin(p) {
+  return `
+    <div class="order-card">
+      <div class="order-head">
+        <div>
+          <div class="order-cliente">${p.producto || '(sin nombre)'}</div>
+          <div class="order-meta">UPC: ${p.upc}${p.marca ? ' · ' + p.marca : ''}${p.activo === false ? ' · inactivo' : ''}</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; align-items:flex-end;">
+        <label style="font-size:12px; color:#8a7a63;">Precio<br />
+          <input type="number" step="0.01" min="0" class="form-field" data-campo-precio="${p.upc}" value="${p.precio ?? ''}" style="width:100px;" />
+        </label>
+        <label style="font-size:12px; color:#8a7a63;">Pzas/caja<br />
+          <input type="number" step="1" min="0" class="form-field" data-campo-caja="${p.upc}" value="${p.unidades_caja ?? ''}" style="width:90px;" />
+        </label>
+        <label style="font-size:12px; color:#8a7a63;">Cajas/tarima<br />
+          <input type="number" step="1" min="0" class="form-field" data-campo-pallet="${p.upc}" value="${p.unidades_pallet ?? ''}" style="width:90px;" />
+        </label>
+        <button data-guardar-producto="${p.upc}">Guardar</button>
+      </div>
+      <p class="hint-text" data-msg-producto="${p.upc}" style="margin-top:6px;"></p>
+    </div>
+  `;
+}
+
+async function guardarProductoAdminClick(upc) {
+  const btn = document.querySelector(`[data-guardar-producto="${upc}"]`);
+  const inputPrecio = document.querySelector(`[data-campo-precio="${upc}"]`);
+  const inputCaja = document.querySelector(`[data-campo-caja="${upc}"]`);
+  const inputPallet = document.querySelector(`[data-campo-pallet="${upc}"]`);
+  const msgEl = document.querySelector(`[data-msg-producto="${upc}"]`);
+
+  const cambios = {};
+  if (inputPrecio.value !== '') cambios.precio = Number(inputPrecio.value);
+  if (inputCaja.value !== '') cambios.unidades_caja = Number(inputCaja.value);
+  if (inputPallet.value !== '') cambios.unidades_pallet = Number(inputPallet.value);
+
+  if (Object.keys(cambios).length === 0) {
+    msgEl.textContent = 'No hay cambios que guardar.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+  msgEl.textContent = '';
+  msgEl.style.color = '';
+
+  const resultado = await guardarProductoAdmin(upc, cambios);
+
+  btn.disabled = false;
+  btn.textContent = 'Guardar';
+
+  if (!resultado.ok) {
+    msgEl.textContent = '✕ ' + (resultado.mensaje || 'Error al guardar.');
+    msgEl.style.color = '#c0392b';
+    return;
+  }
+
+  msgEl.textContent = '✓ Guardado';
+  msgEl.style.color = '#2e7d32';
+  const p = productosAdmin.find((x) => x.upc === upc);
+  if (p) Object.assign(p, cambios);
+  setTimeout(() => {
+    if (msgEl) msgEl.textContent = '';
+  }, 2500);
+}
+
+async function guardarProductoAdmin(upc, cambios) {
+  const {
+    data: { session },
+  } = await supabaseClient.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return { ok: false, mensaje: 'Sesión expirada, vuelve a iniciar sesión.' };
+
+  try {
+    const { data, error } = await productsSupabaseClient.functions.invoke('admin-update-price', {
+      body: { upc, ...cambios },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (error) {
+      let mensaje = error.message || 'Error actualizando producto';
+      try {
+        const ctx = await error.context?.json?.();
+        if (ctx?.error) mensaje = ctx.error;
+      } catch {
+        // si no se puede leer el detalle, se queda con el mensaje genérico
+      }
+      return { ok: false, mensaje };
+    }
+    if (data?.error) return { ok: false, mensaje: data.error };
+    return { ok: true, product: data.product };
+  } catch (err) {
+    return { ok: false, mensaje: String(err) };
+  }
 }
 
 // ============================================================
@@ -501,6 +650,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('usuariosFiltroZip').addEventListener('input', (e) => {
     filtroZipUsuarios = e.target.value;
     renderUsuarios();
+  });
+
+  document.getElementById('productosBusqueda').addEventListener('input', (e) => {
+    busquedaProductosAdmin = e.target.value;
+    renderProductosAdmin();
   });
 
   window.addEventListener('focus', () => {
