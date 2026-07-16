@@ -16,6 +16,18 @@ function establecerIdioma(idioma) {
   location.reload();
 }
 
+// Cadenas de tienda conocidas — mismo orden en el select de registro,
+// en "Mi perfil" y en los checkboxes de admin. Si Doug agrega otra
+// cadena, solo hay que sumarla aquí.
+const CADENAS = ['Wawa', '7-Eleven', 'Circle K', 'Dash-In', 'Independientes'];
+
+// Nombres propios de cadena (Wawa, 7-Eleven, Circle K, Dash-In) se ven
+// igual en ambos idiomas — solo "Independientes" se traduce.
+function labelCadena(cadena) {
+  if (cadena === 'Independientes') return t('cadenaIndependientes');
+  return cadena;
+}
+
 const I18N = {
   es: {
     authTabLogin: 'Iniciar sesión',
@@ -99,6 +111,11 @@ const I18N = {
     perfilErrorSave: 'No se pudo guardar: ',
     idiomaToggleToEn: '🌐 English',
     idiomaToggleToEs: '🌐 Español',
+    regCadenaPh: 'Cadena de tienda',
+    regCadenaDefault: 'Selecciona tu cadena',
+    cadenaIndependientes: 'Independientes',
+    seccionNuevosTitulo: 'Novedades',
+    cardNuevoBadge: '🆕 Nuevo',
   },
   en: {
     authTabLogin: 'Sign in',
@@ -182,6 +199,11 @@ const I18N = {
     perfilErrorSave: "Couldn't save: ",
     idiomaToggleToEn: '🌐 English',
     idiomaToggleToEs: '🌐 Español',
+    regCadenaPh: 'Store chain',
+    regCadenaDefault: 'Select your chain',
+    cadenaIndependientes: 'Independent',
+    seccionNuevosTitulo: 'New arrivals',
+    cardNuevoBadge: '🆕 New',
   },
 };
 

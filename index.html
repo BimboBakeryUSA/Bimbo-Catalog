@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=15" />
+<link rel="stylesheet" href="styles.css?v=16" />
 </head>
 <body>
 
@@ -39,6 +39,9 @@
           </select>
           <input class="form-field" id="regZip" placeholder="ZIP" inputmode="numeric" maxlength="5" />
         </div>
+        <select class="form-field" id="regCadena">
+          <option value="" id="regCadenaDefault">Selecciona tu cadena</option>
+        </select>
         <input class="form-field" id="regEmail" type="email" placeholder="Correo" autocomplete="username" />
         <input class="form-field" id="regPassword" type="password" placeholder="Contraseña" autocomplete="new-password" />
         <p id="registroError" class="error-text hidden"></p>
@@ -98,6 +101,8 @@
         <h1 id="heroTitle">Tu pedido Bimbo,<br />a un clic de distancia</h1>
       </section>
 
+      <div id="novedadesWrap"></div>
+
       <div class="toolbar">
         <div class="search-row">
           <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -140,9 +145,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <!-- JsBarcode (dibuja el UPC como código de barras escaneable) -->
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-  <script src="i18n.js?v=1"></script>
+  <script src="i18n.js?v=2"></script>
   <script src="config.js?v=13"></script>
-  <script src="profile-menu.js?v=13"></script>
-  <script src="app.js?v=18"></script>
+  <script src="profile-menu.js?v=15"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

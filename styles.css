@@ -249,6 +249,18 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   border-radius: 999px;
   box-shadow: var(--shadow-sm);
 }
+.card-nuevo-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--bimbo-navy);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+}
 .card-body {
   padding: 14px 14px 16px;
   display: flex;
@@ -911,3 +923,21 @@ select.form-field {
 }
 .toggle-activo input:checked + .switch { background: #0F8A3D; }
 .toggle-activo input:checked + .switch::after { transform: translateX(16px); }
+
+.prod-admin-cadenas {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.cadena-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+.cadena-check input { margin: 0; }

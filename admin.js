@@ -352,6 +352,23 @@ function renderUsuarios() {
       renderUsuarios();
     });
   });
+  wrap.querySelectorAll('[data-campo-cadena-usuario]').forEach((sel) => {
+    sel.addEventListener('click', (e) => e.stopPropagation());
+    sel.addEventListener('change', (e) => {
+      e.stopPropagation();
+      cambiarCadenaUsuario(sel.dataset.campoCadenaUsuario, sel.value);
+    });
+  });
+}
+
+async function cambiarCadenaUsuario(id, cadena) {
+  const { error } = await supabaseClient.from('profiles').update({ cadena: cadena || null }).eq('id', id);
+  if (error) {
+    console.error('Error actualizando cadena:', error);
+    return;
+  }
+  const u = usuarios.find((x) => x.id === id);
+  if (u) u.cadena = cadena || null;
 }
 
 function tarjetaUsuario(u) {
@@ -387,6 +404,20 @@ function tarjetaUsuario(u) {
     }
   }
 
+  const cadenaHtml =
+    u.role !== 'admin'
+      ? `
+      <div class="order-meta" style="margin-top:6px;">
+        Cadena:
+        <select class="form-field" style="display:inline-block; width:auto; margin-left:4px;" data-campo-cadena-usuario="${u.id}">
+          <option value="">(sin asignar — ve todo)</option>
+          ${(typeof CADENAS !== 'undefined' ? CADENAS : [])
+            .map((c) => `<option value="${c}" ${u.cadena === c ? 'selected' : ''}>${c}</option>`)
+            .join('')}
+        </select>
+      </div>`
+      : '';
+
   return `
     <div class="order-card ${u.estado_cuenta === 'pendiente' ? 'is-nuevo' : ''}">
       <div class="order-head">
@@ -397,6 +428,7 @@ function tarjetaUsuario(u) {
           <div class="order-meta">${u.direccion || ''}${u.ciudad ? ', ' + u.ciudad : ''}${u.estado ? ', ' + u.estado : ''} ${u.zip || ''}</div>
           <div class="order-meta">Registrado: ${fecha}</div>
           <span class="order-badge ${u.role === 'admin' ? 'admin' : u.estado_cuenta}">${u.role === 'admin' ? 'admin' : u.estado_cuenta}</span>
+          ${cadenaHtml}
         </div>
       </div>
       <div class="order-actions">${acciones.join('')}</div>
@@ -464,7 +496,7 @@ async function cargarProductosAdmin() {
   }
   const { data, error } = await productsSupabaseClient
     .from('products')
-    .select('upc, producto, precio, unidades_caja, unidades_pallet, marca, activo, foto')
+    .select('upc, producto, precio, unidades_caja, unidades_pallet, marca, activo, foto, cadenas_permitidas, es_nuevo')
     .order('producto');
   if (error) {
     console.error('Error cargando productos:', error);
@@ -504,9 +536,21 @@ function renderProductosAdmin() {
 
 function tarjetaProductoAdmin(p) {
   const inactivo = p.activo === false;
+  const esNuevo = p.es_nuevo === true;
   const fotoHtml = p.foto
     ? `<div class="prod-admin-photo" data-ver-foto="${p.foto}" data-ver-foto-nombre="${(p.producto || '').replace(/"/g, '&quot;')}"><img src="${p.foto}" alt=""></div>`
     : `<div class="prod-admin-photo"><span class="icon">🍞</span></div>`;
+
+  const cadenasActuales = Array.isArray(p.cadenas_permitidas) ? p.cadenas_permitidas : [];
+  const cadenasHtml = (typeof CADENAS !== 'undefined' ? CADENAS : [])
+    .map(
+      (c) => `
+      <label class="cadena-check">
+        <input type="checkbox" data-campo-cadena="${p.upc}" value="${c}" ${cadenasActuales.includes(c) ? 'checked' : ''} />
+        ${c}
+      </label>`
+    )
+    .join('');
 
   return `
     <div class="order-card prod-admin-card ${inactivo ? 'is-inactivo' : ''}">
@@ -529,7 +573,16 @@ function tarjetaProductoAdmin(p) {
             <span class="switch"></span>
             <span data-label-activo="${p.upc}">${inactivo ? 'Pausado' : 'Activo'}</span>
           </label>
+          <label class="toggle-activo">
+            <input type="checkbox" data-campo-nuevo="${p.upc}" ${esNuevo ? 'checked' : ''} />
+            <span class="switch"></span>
+            <span data-label-nuevo="${p.upc}">${esNuevo ? 'Nuevo ✓' : 'Marcar como nuevo'}</span>
+          </label>
           <button data-guardar-producto="${p.upc}">Guardar</button>
+        </div>
+        <div class="prod-admin-cadenas">
+          <span class="hint-text" style="margin:0 8px 0 0;">Cadenas autorizadas (vacío = todas):</span>
+          ${cadenasHtml}
         </div>
         <p class="hint-text" data-msg-producto="${p.upc}" style="margin-top:6px; text-align:left;"></p>
       </div>
@@ -543,6 +596,8 @@ async function guardarProductoAdminClick(upc) {
   const inputCaja = document.querySelector(`[data-campo-caja="${upc}"]`);
   const inputPallet = document.querySelector(`[data-campo-pallet="${upc}"]`);
   const inputActivo = document.querySelector(`[data-campo-activo="${upc}"]`);
+  const inputNuevo = document.querySelector(`[data-campo-nuevo="${upc}"]`);
+  const inputsCadena = document.querySelectorAll(`[data-campo-cadena="${upc}"]`);
   const msgEl = document.querySelector(`[data-msg-producto="${upc}"]`);
 
   const p = productosAdmin.find((x) => x.upc === upc);
@@ -552,6 +607,17 @@ async function guardarProductoAdminClick(upc) {
   if (inputPallet.value !== '') cambios.unidades_pallet = Number(inputPallet.value);
   const activoActual = p ? p.activo !== false : true;
   if (inputActivo.checked !== activoActual) cambios.activo = inputActivo.checked;
+  const nuevoActual = p ? p.es_nuevo === true : false;
+  if (inputNuevo.checked !== nuevoActual) cambios.es_nuevo = inputNuevo.checked;
+
+  const cadenasSeleccionadas = Array.from(inputsCadena)
+    .filter((cb) => cb.checked)
+    .map((cb) => cb.value);
+  const cadenasActuales = p && Array.isArray(p.cadenas_permitidas) ? p.cadenas_permitidas : [];
+  const cadenasCambiaron =
+    cadenasSeleccionadas.length !== cadenasActuales.length ||
+    cadenasSeleccionadas.some((c) => !cadenasActuales.includes(c));
+  if (cadenasCambiaron) cambios.cadenas_permitidas = cadenasSeleccionadas;
 
   if (Object.keys(cambios).length === 0) {
     msgEl.textContent = 'No hay cambios que guardar.';
@@ -581,6 +647,8 @@ async function guardarProductoAdminClick(upc) {
   if (card) card.classList.toggle('is-inactivo', inputActivo.checked === false);
   const labelEl = document.querySelector(`[data-label-activo="${upc}"]`);
   if (labelEl) labelEl.textContent = inputActivo.checked ? 'Activo' : 'Pausado';
+  const labelNuevoEl = document.querySelector(`[data-label-nuevo="${upc}"]`);
+  if (labelNuevoEl) labelNuevoEl.textContent = inputNuevo.checked ? 'Nuevo ✓' : 'Marcar como nuevo';
   setTimeout(() => {
     if (msgEl) msgEl.textContent = '';
   }, 2500);

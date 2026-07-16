@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v18 — idioma Español/English en menú de perfil';
+const VERSION = 'v20 — Novedades + cadenas de tienda + fix guardar (403)';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -55,6 +55,7 @@ async function mostrarApp() {
 
   document.getElementById('appShell').classList.remove('hidden');
   await cargarProductos();
+  renderNovedades();
   renderChips();
   renderCatalogo();
   actualizarBadge();
@@ -162,12 +163,13 @@ async function registrarse() {
   const ciudad = document.getElementById('regCiudad').value.trim();
   const estado = document.getElementById('regEstado').value.trim();
   const zip = document.getElementById('regZip').value.trim();
+  const cadena = document.getElementById('regCadena').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const password = document.getElementById('regPassword').value;
   const errorEl = document.getElementById('registroError');
   const btn = document.getElementById('registroBtn');
 
-  if (!tienda || !nombre || !telefono || !direccion || !ciudad || !estado || !zip || !email || !password) {
+  if (!tienda || !nombre || !telefono || !direccion || !ciudad || !estado || !zip || !cadena || !email || !password) {
     errorEl.textContent = t('registroErrorEmpty');
     errorEl.classList.remove('hidden');
     return;
@@ -180,7 +182,7 @@ async function registrarse() {
     email,
     password,
     options: {
-      data: { tienda_nombre: tienda, nombre, telefono, direccion, ciudad, estado, zip },
+      data: { tienda_nombre: tienda, nombre, telefono, direccion, ciudad, estado, zip, cadena },
     },
   });
   btn.disabled = false;
@@ -340,7 +342,22 @@ function mapProductoDB(row) {
     // Solo se usa para ordenar y para decidir "Hot" — nunca se muestra.
     ventasTotales: row.ventas_totales != null ? Number(row.ventas_totales) : 0,
     esHot: false,
+    // Cadenas donde está autorizado (vacío = sin restricción, todas lo ven).
+    cadenasPermitidas: Array.isArray(row.cadenas_permitidas) ? row.cadenas_permitidas : [],
+    esNuevo: !!row.es_nuevo,
   };
+}
+
+// Un producto es visible para el cliente si no tiene restricción de cadena
+// (cadenasPermitidas vacío = universal) o si la cadena del cliente está en
+// la lista. Clientes sin cadena asignada (perfilActual.cadena vacío/null)
+// ven todo, sin restricción — así nadie se queda sin catálogo mientras se
+// le asigna una cadena.
+function productoVisibleParaCliente(producto) {
+  const cadenaCliente = perfilActual?.cadena;
+  if (!cadenaCliente) return true;
+  if (!producto.cadenasPermitidas || producto.cadenasPermitidas.length === 0) return true;
+  return producto.cadenasPermitidas.includes(cadenaCliente);
 }
 
 // Marca los 10 productos más vendidos DE CADA CATEGORÍA (marca) como
@@ -377,13 +394,13 @@ async function cargarProductos() {
     await cargarPrefijosMarca();
     const { data, error } = await productsSupabaseClient
       .from('products')
-      .select('upc, sku, producto, precio, unidades_caja, unidades_pallet, foto, activo, marca, ventas_totales')
+      .select('upc, sku, producto, precio, unidades_caja, unidades_pallet, foto, activo, marca, ventas_totales, cadenas_permitidas, es_nuevo')
       .eq('activo', true)
       .not('precio', 'is', null)
       .gt('precio', 0)
       .order('ventas_totales', { ascending: false, nullsFirst: false });
     if (error) throw error;
-    PRODUCTOS = (data || []).map(mapProductoDB);
+    PRODUCTOS = (data || []).map(mapProductoDB).filter(productoVisibleParaCliente);
     marcarProductosHot(PRODUCTOS);
     localStorage.setItem(PRODUCTOS_CACHE_KEY, JSON.stringify(PRODUCTOS));
   } catch (err) {
@@ -497,6 +514,35 @@ function renderChips() {
 }
 
 // ============================================================
+// RENDER: NOVEDADES — franja de productos marcados como nuevos por el
+// admin (panel Productos > toggle "Nuevo"), visible arriba del catálogo
+// mientras el cliente navega. Se recalcula junto con el resto del
+// catálogo (respeta activo/precio/cadena, igual que todo lo demás).
+// ============================================================
+function renderNovedades() {
+  const wrap = document.getElementById('novedadesWrap');
+  if (!wrap) return;
+  const nuevos = PRODUCTOS.filter((p) => p.esNuevo);
+  if (nuevos.length === 0) {
+    wrap.innerHTML = '';
+    return;
+  }
+  const section = document.createElement('section');
+  const titulo = document.createElement('h2');
+  titulo.className = 'category-title';
+  titulo.textContent = t('seccionNuevosTitulo');
+  section.appendChild(titulo);
+
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+  nuevos.forEach((producto) => grid.appendChild(crearTarjetaProducto(producto)));
+  section.appendChild(grid);
+
+  wrap.innerHTML = '';
+  wrap.appendChild(section);
+}
+
+// ============================================================
 // RENDER: CATÁLOGO
 // ============================================================
 function renderCatalogo() {
@@ -548,6 +594,9 @@ function crearTarjetaProducto(producto) {
   }
   if (producto.esHot) {
     image.innerHTML += `<span class="card-hot-badge">${t('cardHotBadge')}</span>`;
+  }
+  if (producto.esNuevo) {
+    image.innerHTML += `<span class="card-nuevo-badge">${t('cardNuevoBadge')}</span>`;
   }
   image.onclick = () => abrirDetalleProducto(producto.slug);
 
@@ -900,6 +949,7 @@ function aplicarTraduccionesEstaticas() {
   document.getElementById('regCiudad').placeholder = t('regCiudadPh');
   document.getElementById('regEstadoDefault').textContent = t('regEstadoPh');
   document.getElementById('regZip').placeholder = t('regZipPh');
+  document.getElementById('regCadenaDefault').textContent = t('regCadenaDefault');
   document.getElementById('regEmail').placeholder = t('regEmailPh');
   document.getElementById('regPassword').placeholder = t('regPasswordPh');
   document.getElementById('registroBtn').textContent = t('registroBtn');
@@ -927,9 +977,10 @@ function aplicarTraduccionesEstaticas() {
 document.addEventListener('DOMContentLoaded', () => {
   aplicarTraduccionesEstaticas();
 
-  // Opciones de Estado en el formulario de registro
+  // Opciones de Estado y Cadena en el formulario de registro
   document.getElementById('regEstado').innerHTML +=
     ESTADOS_SERVICIO.map((e) => `<option value="${e.valor}">${e.valor} — ${e.nombre}</option>`).join('');
+  document.getElementById('regCadena').innerHTML += CADENAS.map((c) => `<option value="${c}">${labelCadena(c)}</option>`).join('');
 
   document.querySelectorAll('.auth-tab').forEach((btn) => {
     btn.addEventListener('click', () => cambiarTabAuth(btn.dataset.tab));

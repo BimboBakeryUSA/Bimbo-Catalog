@@ -114,6 +114,9 @@ function asegurarModalPerfil() {
         </select>
         <input class="form-field" id="perfilZip" placeholder="ZIP" inputmode="numeric" maxlength="5" />
       </div>
+      <select class="form-field" id="perfilCadena">
+        <option value="" id="perfilCadenaDefault">Selecciona tu cadena</option>
+      </select>
       <p id="perfilError" class="error-text hidden"></p>
       <p id="perfilOk" class="hint-text hidden" style="color:#0F8A3D;">✓ Datos guardados.</p>
       <button class="btn-primary" id="perfilGuardarBtn">Guardar cambios</button>
@@ -129,6 +132,7 @@ function asegurarModalPerfil() {
     modal.querySelector('#perfilCiudad').placeholder = t('regCiudadPh');
     modal.querySelector('#perfilEstadoDefault').textContent = t('regEstadoPh');
     modal.querySelector('#perfilZip').placeholder = t('regZipPh');
+    modal.querySelector('#perfilCadenaDefault').textContent = t('regCadenaDefault');
     modal.querySelector('#perfilOk').textContent = '✓ ' + t('perfilOk').replace(/^✓\s*/, '');
     modal.querySelector('#perfilGuardarBtn').textContent = t('perfilGuardarBtn');
   }
@@ -139,6 +143,14 @@ function asegurarModalPerfil() {
     'beforeend',
     (typeof ESTADOS_SERVICIO !== 'undefined' ? ESTADOS_SERVICIO : [])
       .map((e) => `<option value="${e.valor}">${e.valor} — ${e.nombre}</option>`)
+      .join('')
+  );
+
+  const selectCadena = document.getElementById('perfilCadena');
+  selectCadena.insertAdjacentHTML(
+    'beforeend',
+    (typeof CADENAS !== 'undefined' ? CADENAS : [])
+      .map((c) => `<option value="${c}">${typeof labelCadena === 'function' ? labelCadena(c) : c}</option>`)
       .join('')
   );
 
@@ -166,6 +178,7 @@ async function abrirModalPerfil() {
   document.getElementById('perfilCiudad').value = perfil?.ciudad || '';
   document.getElementById('perfilEstado').value = perfil?.estado || '';
   document.getElementById('perfilZip').value = perfil?.zip || '';
+  document.getElementById('perfilCadena').value = perfil?.cadena || '';
   document.getElementById('perfilError').classList.add('hidden');
   document.getElementById('perfilOk').classList.add('hidden');
 
@@ -191,6 +204,10 @@ async function guardarPerfilPropio() {
     ciudad: document.getElementById('perfilCiudad').value.trim(),
     estado: document.getElementById('perfilEstado').value.trim(),
     zip: document.getElementById('perfilZip').value.trim(),
+    // Cadena es opcional aquí (a diferencia del registro): si el cliente
+    // ya tenía cuenta antes de que existiera este campo, no lo bloqueamos
+    // de guardar el resto de sus datos por no tener cadena todavía.
+    cadena: document.getElementById('perfilCadena').value.trim() || null,
   };
 
   if (
