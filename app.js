@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v21 — carrusel Novedades + Populares + cadenas default Independientes + sin zoom';
+const VERSION = 'v22 — Novedades y Populares como pestañas de categoría';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -497,14 +497,28 @@ function getCategorias() {
   return [...new Set(PRODUCTOS.map((p) => p.categoria))];
 }
 
+// "Novedades" y "Populares" son categorías especiales (no vienen de
+// products.marca): solo se agregan como chip si hay al menos un producto
+// que califique, para no mostrar una pestaña vacía.
+function labelChip(cat) {
+  if (cat === 'Todas') return t('chipTodas');
+  if (cat === 'Novedades') return t('seccionNuevosTitulo');
+  if (cat === 'Populares') return t('seccionPopularesTitulo');
+  return displayCategoria(cat);
+}
+
 function renderChips() {
   const wrap = document.getElementById('chipsWrap');
-  const categorias = ['Todas', ...getCategorias()];
+  const tieneNuevos = PRODUCTOS.some((p) => p.esNuevo);
+  const tienePopulares = PRODUCTOS.some((p) => p.esHot);
+  const categorias = [
+    'Todas',
+    ...(tieneNuevos ? ['Novedades'] : []),
+    ...(tienePopulares ? ['Populares'] : []),
+    ...getCategorias(),
+  ];
   wrap.innerHTML = categorias
-    .map(
-      (cat) =>
-        `<button class="chip${cat === categoriaActiva ? ' active' : ''}" data-cat="${cat}">${cat === 'Todas' ? t('chipTodas') : displayCategoria(cat)}</button>`
-    )
+    .map((cat) => `<button class="chip${cat === categoriaActiva ? ' active' : ''}" data-cat="${cat}">${labelChip(cat)}</button>`)
     .join('');
   wrap.querySelectorAll('.chip').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -516,11 +530,14 @@ function renderChips() {
 }
 
 // ============================================================
-// RENDER: NOVEDADES Y POPULARES — secciones de descubrimiento que se
-// intercalan al principio de renderCatalogo(), en el mismo lugar donde
-// antes arrancaba la primera categoría (Barcel). Ambas respetan
-// activo/precio/cadena igual que el resto (ya vienen filtradas en
-// PRODUCTOS desde cargarProductos()).
+// RENDER: NOVEDADES Y POPULARES
+// - Novedades: además de tener su propio chip en el menú de categorías,
+//   se muestra siempre como carrusel al principio de la vista general
+//   ("Todas", sin buscar) — es la única que tiene esta doble aparición.
+// - Populares: SOLO aparece cuando su chip está activo (como cualquier
+//   categoría normal, con tarjeta completa).
+// Ambas respetan activo/precio/cadena igual que el resto (ya vienen
+// filtradas en PRODUCTOS desde cargarProductos()).
 // ============================================================
 // Tile compacto (solo foto cuadrada + nombre chico) para el carrusel de
 // Novedades — a diferencia de la tarjeta normal, no lleva precio ni botón
@@ -563,14 +580,14 @@ function crearSeccionNovedades(productos) {
   return section;
 }
 
-// Sección "Populares" — mismos productos marcados "Hot" (top ventas por
-// categoría), en el mismo formato de tarjeta que las categorías normales,
-// para que se puedan agarrar de inmediato sin tener que buscarlos.
-function crearSeccionPopulares(productos) {
+// Sección genérica con título + grid de tarjetas completas — la usan
+// tanto las categorías normales (marca) como las pestañas "Novedades" y
+// "Populares" cuando están activas.
+function crearSeccionGrid(tituloTexto, productos) {
   const section = document.createElement('section');
   const titulo = document.createElement('h2');
   titulo.className = 'category-title';
-  titulo.textContent = t('seccionPopularesTitulo');
+  titulo.textContent = tituloTexto;
   section.appendChild(titulo);
 
   const grid = document.createElement('div');
@@ -590,47 +607,40 @@ function renderCatalogo() {
   const texto = textoBusqueda.trim().toLowerCase();
   let algoRenderizado = false;
 
-  // Novedades y Populares solo aparecen en la vista general (sin buscar y
-  // con "Todas" seleccionado) — son secciones de descubrimiento, no tiene
-  // sentido mostrarlas mezcladas con resultados de búsqueda o de una
-  // categoría específica.
+  // Carrusel ambiental de Novedades — solo en la vista general ("Todas",
+  // sin buscar). Se muestra ADEMÁS de su propio chip, no en vez de él.
   if (!texto && categoriaActiva === 'Todas') {
     const nuevos = PRODUCTOS.filter((p) => p.esNuevo);
     if (nuevos.length > 0) {
       wrap.appendChild(crearSeccionNovedades(nuevos));
       algoRenderizado = true;
     }
-    const populares = PRODUCTOS.filter((p) => p.esHot);
-    if (populares.length > 0) {
-      wrap.appendChild(crearSeccionPopulares(populares));
-      algoRenderizado = true;
-    }
   }
 
-  const productosFiltrados = PRODUCTOS.filter((p) => {
-    const coincideTexto = p.nombre.toLowerCase().includes(texto);
-    const coincideCategoria = categoriaActiva === 'Todas' || p.categoria === categoriaActiva;
-    return coincideTexto && coincideCategoria;
-  });
+  if (categoriaActiva === 'Novedades' || categoriaActiva === 'Populares') {
+    // Pestaña "Novedades" o "Populares" activa: se comportan como una
+    // categoría más (tarjeta completa con precio y botón Agregar), y
+    // también respetan el buscador.
+    const base = categoriaActiva === 'Novedades' ? PRODUCTOS.filter((p) => p.esNuevo) : PRODUCTOS.filter((p) => p.esHot);
+    const filtrados = base.filter((p) => p.nombre.toLowerCase().includes(texto));
+    if (filtrados.length > 0) {
+      wrap.appendChild(crearSeccionGrid(labelChip(categoriaActiva), filtrados));
+      algoRenderizado = true;
+    }
+  } else {
+    const productosFiltrados = PRODUCTOS.filter((p) => {
+      const coincideTexto = p.nombre.toLowerCase().includes(texto);
+      const coincideCategoria = categoriaActiva === 'Todas' || p.categoria === categoriaActiva;
+      return coincideTexto && coincideCategoria;
+    });
 
-  getCategorias().forEach((categoria) => {
-    const productosCategoria = productosFiltrados.filter((p) => p.categoria === categoria);
-    if (productosCategoria.length === 0) return;
-    algoRenderizado = true;
-
-    const section = document.createElement('section');
-    const titulo = document.createElement('h2');
-    titulo.className = 'category-title';
-    titulo.textContent = displayCategoria(categoria);
-    section.appendChild(titulo);
-
-    const grid = document.createElement('div');
-    grid.className = 'grid';
-    productosCategoria.forEach((producto) => grid.appendChild(crearTarjetaProducto(producto)));
-
-    section.appendChild(grid);
-    wrap.appendChild(section);
-  });
+    getCategorias().forEach((categoria) => {
+      const productosCategoria = productosFiltrados.filter((p) => p.categoria === categoria);
+      if (productosCategoria.length === 0) return;
+      algoRenderizado = true;
+      wrap.appendChild(crearSeccionGrid(displayCategoria(categoria), productosCategoria));
+    });
+  }
 
   if (!algoRenderizado) {
     wrap.innerHTML = `<p class="empty-state">${t('emptyState')}</p>`;
