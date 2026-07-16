@@ -581,7 +581,7 @@ function tarjetaProductoAdmin(p) {
           <button data-guardar-producto="${p.upc}">Guardar</button>
         </div>
         <div class="prod-admin-cadenas">
-          <span class="hint-text" style="margin:0 8px 0 0;">Cadenas autorizadas (vacío = todas):</span>
+          <span class="hint-text" style="margin:0 8px 0 0;">Cadenas autorizadas (Independientes por defecto):</span>
           ${cadenasHtml}
         </div>
         <p class="hint-text" data-msg-producto="${p.upc}" style="margin-top:6px; text-align:left;"></p>

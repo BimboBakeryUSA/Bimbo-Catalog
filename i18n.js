@@ -116,6 +116,7 @@ const I18N = {
     cadenaIndependientes: 'Independientes',
     seccionNuevosTitulo: 'Novedades',
     cardNuevoBadge: '🆕 Nuevo',
+    seccionPopularesTitulo: 'Populares',
   },
   en: {
     authTabLogin: 'Sign in',
@@ -204,6 +205,7 @@ const I18N = {
     cadenaIndependientes: 'Independent',
     seccionNuevosTitulo: 'New arrivals',
     cardNuevoBadge: '🆕 New',
+    seccionPopularesTitulo: 'Popular',
   },
 };
 

@@ -2,12 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Panel de pedidos — Catálogo Bimbo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=16" />
+<link rel="stylesheet" href="styles.css?v=17" />
 </head>
 <body>
 
@@ -103,7 +103,7 @@
             <option value="inactivo">Pausados (ocultos)</option>
           </select>
         </div>
-        <p class="hint-text">Edita precio, piezas por caja, cajas por tarima, pausa el producto, márcalo como "Nuevo" (aparece en Novedades del catálogo) o limita las cadenas donde está autorizado, y da clic en Guardar. Los cambios se reflejan de inmediato.</p>
+        <p class="hint-text">Edita precio, piezas por caja, cajas por tarima, pausa el producto, márcalo como "Nuevo" (aparece en Novedades del catálogo) o agrega las cadenas donde está autorizado además de Independientes (por defecto solo lo ven clientes Independientes), y da clic en Guardar. Los cambios se reflejan de inmediato.</p>
         <div id="productosWrap"></div>
       </div>
     </main>
@@ -118,9 +118,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="i18n.js?v=2"></script>
+  <script src="i18n.js?v=3"></script>
   <script src="config.js?v=13"></script>
   <script src="profile-menu.js?v=15"></script>
-  <script src="admin.js?v=16"></script>
+  <script src="admin.js?v=17"></script>
 </body>
 </html>

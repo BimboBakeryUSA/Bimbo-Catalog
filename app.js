@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v20 — Novedades + cadenas de tienda + fix guardar (403)';
+const VERSION = 'v21 — carrusel Novedades + Populares + cadenas default Independientes + sin zoom';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -55,7 +55,6 @@ async function mostrarApp() {
 
   document.getElementById('appShell').classList.remove('hidden');
   await cargarProductos();
-  renderNovedades();
   renderChips();
   renderCatalogo();
   actualizarBadge();
@@ -342,22 +341,25 @@ function mapProductoDB(row) {
     // Solo se usa para ordenar y para decidir "Hot" — nunca se muestra.
     ventasTotales: row.ventas_totales != null ? Number(row.ventas_totales) : 0,
     esHot: false,
-    // Cadenas donde está autorizado (vacío = sin restricción, todas lo ven).
+    // Cadenas donde está autorizado (por defecto solo Independientes).
     cadenasPermitidas: Array.isArray(row.cadenas_permitidas) ? row.cadenas_permitidas : [],
     esNuevo: !!row.es_nuevo,
   };
 }
 
-// Un producto es visible para el cliente si no tiene restricción de cadena
-// (cadenasPermitidas vacío = universal) o si la cadena del cliente está en
-// la lista. Clientes sin cadena asignada (perfilActual.cadena vacío/null)
-// ven todo, sin restricción — así nadie se queda sin catálogo mientras se
-// le asigna una cadena.
+// Un producto solo es visible para clientes cuya cadena esté en su lista
+// de cadenas autorizadas (por defecto, todos los productos traen
+// "Independientes" — Doug agrega manualmente Wawa/7-Eleven/Circle K/Dash-In
+// donde corresponda). Si eres 7-Eleven, solo ves lo autorizado para
+// 7-Eleven; si eres Independiente, ves todo lo que tenga Independientes
+// (que es prácticamente todo, salvo que Doug lo quite a propósito).
+// Clientes sin cadena asignada todavía (perfilActual.cadena vacío/null)
+// ven el catálogo completo sin restricción — así nadie se queda sin poder
+// pedir mientras se le asigna una cadena.
 function productoVisibleParaCliente(producto) {
   const cadenaCliente = perfilActual?.cadena;
   if (!cadenaCliente) return true;
-  if (!producto.cadenasPermitidas || producto.cadenasPermitidas.length === 0) return true;
-  return producto.cadenasPermitidas.includes(cadenaCliente);
+  return (producto.cadenasPermitidas || []).includes(cadenaCliente);
 }
 
 // Marca los 10 productos más vendidos DE CADA CATEGORÍA (marca) como
@@ -514,32 +516,69 @@ function renderChips() {
 }
 
 // ============================================================
-// RENDER: NOVEDADES — franja de productos marcados como nuevos por el
-// admin (panel Productos > toggle "Nuevo"), visible arriba del catálogo
-// mientras el cliente navega. Se recalcula junto con el resto del
-// catálogo (respeta activo/precio/cadena, igual que todo lo demás).
+// RENDER: NOVEDADES Y POPULARES — secciones de descubrimiento que se
+// intercalan al principio de renderCatalogo(), en el mismo lugar donde
+// antes arrancaba la primera categoría (Barcel). Ambas respetan
+// activo/precio/cadena igual que el resto (ya vienen filtradas en
+// PRODUCTOS desde cargarProductos()).
 // ============================================================
-function renderNovedades() {
-  const wrap = document.getElementById('novedadesWrap');
-  if (!wrap) return;
-  const nuevos = PRODUCTOS.filter((p) => p.esNuevo);
-  if (nuevos.length === 0) {
-    wrap.innerHTML = '';
-    return;
-  }
+// Tile compacto (solo foto cuadrada + nombre chico) para el carrusel de
+// Novedades — a diferencia de la tarjeta normal, no lleva precio ni botón
+// de Agregar; el clic en la foto lleva directo al detalle del producto.
+function crearTileNovedad(producto) {
+  const tile = document.createElement('div');
+  tile.className = 'novedad-tile';
+  tile.onclick = () => abrirDetalleProducto(producto.slug);
+
+  const photo = document.createElement('div');
+  photo.className = 'novedad-photo';
+  photo.innerHTML = producto.foto
+    ? `<img src="${producto.foto}" alt="${producto.nombre}">`
+    : `<span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span>`;
+  tile.appendChild(photo);
+
+  const nombre = document.createElement('span');
+  nombre.className = 'novedad-nombre';
+  nombre.textContent = producto.nombre;
+  tile.appendChild(nombre);
+
+  return tile;
+}
+
+// Sección "Novedades" — carrusel horizontal compacto (fotos cuadradas,
+// deslizable), para no ocupar tanto espacio vertical como una tarjeta
+// completa.
+function crearSeccionNovedades(productos) {
   const section = document.createElement('section');
   const titulo = document.createElement('h2');
   titulo.className = 'category-title';
   titulo.textContent = t('seccionNuevosTitulo');
   section.appendChild(titulo);
 
+  const carrusel = document.createElement('div');
+  carrusel.className = 'novedades-scroll';
+  productos.forEach((producto) => carrusel.appendChild(crearTileNovedad(producto)));
+  section.appendChild(carrusel);
+
+  return section;
+}
+
+// Sección "Populares" — mismos productos marcados "Hot" (top ventas por
+// categoría), en el mismo formato de tarjeta que las categorías normales,
+// para que se puedan agarrar de inmediato sin tener que buscarlos.
+function crearSeccionPopulares(productos) {
+  const section = document.createElement('section');
+  const titulo = document.createElement('h2');
+  titulo.className = 'category-title';
+  titulo.textContent = t('seccionPopularesTitulo');
+  section.appendChild(titulo);
+
   const grid = document.createElement('div');
   grid.className = 'grid';
-  nuevos.forEach((producto) => grid.appendChild(crearTarjetaProducto(producto)));
+  productos.forEach((producto) => grid.appendChild(crearTarjetaProducto(producto)));
   section.appendChild(grid);
 
-  wrap.innerHTML = '';
-  wrap.appendChild(section);
+  return section;
 }
 
 // ============================================================
@@ -549,6 +588,24 @@ function renderCatalogo() {
   const wrap = document.getElementById('categoriesWrap');
   wrap.innerHTML = '';
   const texto = textoBusqueda.trim().toLowerCase();
+  let algoRenderizado = false;
+
+  // Novedades y Populares solo aparecen en la vista general (sin buscar y
+  // con "Todas" seleccionado) — son secciones de descubrimiento, no tiene
+  // sentido mostrarlas mezcladas con resultados de búsqueda o de una
+  // categoría específica.
+  if (!texto && categoriaActiva === 'Todas') {
+    const nuevos = PRODUCTOS.filter((p) => p.esNuevo);
+    if (nuevos.length > 0) {
+      wrap.appendChild(crearSeccionNovedades(nuevos));
+      algoRenderizado = true;
+    }
+    const populares = PRODUCTOS.filter((p) => p.esHot);
+    if (populares.length > 0) {
+      wrap.appendChild(crearSeccionPopulares(populares));
+      algoRenderizado = true;
+    }
+  }
 
   const productosFiltrados = PRODUCTOS.filter((p) => {
     const coincideTexto = p.nombre.toLowerCase().includes(texto);
@@ -559,6 +616,7 @@ function renderCatalogo() {
   getCategorias().forEach((categoria) => {
     const productosCategoria = productosFiltrados.filter((p) => p.categoria === categoria);
     if (productosCategoria.length === 0) return;
+    algoRenderizado = true;
 
     const section = document.createElement('section');
     const titulo = document.createElement('h2');
@@ -574,7 +632,7 @@ function renderCatalogo() {
     wrap.appendChild(section);
   });
 
-  if (productosFiltrados.length === 0) {
+  if (!algoRenderizado) {
     wrap.innerHTML = `<p class="empty-state">${t('emptyState')}</p>`;
   }
 }

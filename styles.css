@@ -941,3 +941,49 @@ select.form-field {
   user-select: none;
 }
 .cadena-check input { margin: 0; }
+
+/* Novedades: carrusel horizontal de fotos cuadradas (compacto, sin el
+   alto de una tarjeta completa) — hasta ~4 visibles a lo ancho en
+   desktop, deslizable con el dedo en el celular. */
+.novedades-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.novedad-tile {
+  flex: 0 0 calc(25% - 8px);
+  min-width: 84px;
+  max-width: 150px;
+  scroll-snap-align: start;
+  cursor: pointer;
+}
+.novedad-photo {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.novedad-photo img { width: 100%; height: 100%; object-fit: contain; }
+.novedad-photo .icon { font-size: 1.8rem; }
+.novedad-nombre {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+@media (max-width: 640px) {
+  .novedad-tile { flex-basis: calc(33.333% - 7px); }
+}
