@@ -455,6 +455,7 @@ function cambiarPanelAdmin(panel) {
 // (catalogo-bimbo) y solo entonces hace el UPDATE con su propia service role.
 let productosAdmin = [];
 let busquedaProductosAdmin = '';
+let filtroActivoProductos = 'todos';
 
 async function cargarProductosAdmin() {
   if (!productsSupabaseClient) {
@@ -463,7 +464,7 @@ async function cargarProductosAdmin() {
   }
   const { data, error } = await productsSupabaseClient
     .from('products')
-    .select('upc, producto, precio, unidades_caja, unidades_pallet, marca, activo')
+    .select('upc, producto, precio, unidades_caja, unidades_pallet, marca, activo, foto')
     .order('producto');
   if (error) {
     console.error('Error cargando productos:', error);
@@ -478,8 +479,12 @@ function renderProductosAdmin() {
   const texto = busquedaProductosAdmin.trim().toLowerCase();
 
   const filtrados = productosAdmin.filter((p) => {
-    if (!texto) return true;
-    return (p.producto || '').toLowerCase().includes(texto) || (p.upc || '').includes(texto);
+    const coincideTexto = !texto || (p.producto || '').toLowerCase().includes(texto) || (p.upc || '').includes(texto);
+    const coincideActivo =
+      filtroActivoProductos === 'todos' ||
+      (filtroActivoProductos === 'activo' && p.activo !== false) ||
+      (filtroActivoProductos === 'inactivo' && p.activo === false);
+    return coincideTexto && coincideActivo;
   });
 
   if (filtrados.length === 0) {
@@ -492,30 +497,42 @@ function renderProductosAdmin() {
   wrap.querySelectorAll('[data-guardar-producto]').forEach((btn) => {
     btn.addEventListener('click', () => guardarProductoAdminClick(btn.dataset.guardarProducto));
   });
+  wrap.querySelectorAll('[data-ver-foto]').forEach((el) => {
+    el.addEventListener('click', () => abrirImagenGrande(el.dataset.verFoto, el.dataset.verFotoNombre || ''));
+  });
 }
 
 function tarjetaProductoAdmin(p) {
+  const inactivo = p.activo === false;
+  const fotoHtml = p.foto
+    ? `<div class="prod-admin-photo" data-ver-foto="${p.foto}" data-ver-foto-nombre="${(p.producto || '').replace(/"/g, '&quot;')}"><img src="${p.foto}" alt=""></div>`
+    : `<div class="prod-admin-photo"><span class="icon">🍞</span></div>`;
+
   return `
-    <div class="order-card">
-      <div class="order-head">
-        <div>
-          <div class="order-cliente">${p.producto || '(sin nombre)'}</div>
-          <div class="order-meta">UPC: ${p.upc}${p.marca ? ' · ' + p.marca : ''}${p.activo === false ? ' · inactivo' : ''}</div>
+    <div class="order-card prod-admin-card ${inactivo ? 'is-inactivo' : ''}">
+      ${fotoHtml}
+      <div class="prod-admin-body">
+        <div class="order-cliente">${p.producto || '(sin nombre)'}</div>
+        <div class="order-meta">UPC: ${p.upc}${p.marca ? ' · ' + p.marca : ''}</div>
+        <div class="prod-admin-fields">
+          <label>Precio<br />
+            <input type="number" step="0.01" min="0" class="form-field" data-campo-precio="${p.upc}" value="${p.precio ?? ''}" />
+          </label>
+          <label>Pzas/caja<br />
+            <input type="number" step="1" min="0" class="form-field" data-campo-caja="${p.upc}" value="${p.unidades_caja ?? ''}" />
+          </label>
+          <label>Cajas/tarima<br />
+            <input type="number" step="1" min="0" class="form-field" data-campo-pallet="${p.upc}" value="${p.unidades_pallet ?? ''}" />
+          </label>
+          <label class="toggle-activo">
+            <input type="checkbox" data-campo-activo="${p.upc}" ${inactivo ? '' : 'checked'} />
+            <span class="switch"></span>
+            <span data-label-activo="${p.upc}">${inactivo ? 'Pausado' : 'Activo'}</span>
+          </label>
+          <button data-guardar-producto="${p.upc}">Guardar</button>
         </div>
+        <p class="hint-text" data-msg-producto="${p.upc}" style="margin-top:6px; text-align:left;"></p>
       </div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; align-items:flex-end;">
-        <label style="font-size:12px; color:#8a7a63;">Precio<br />
-          <input type="number" step="0.01" min="0" class="form-field" data-campo-precio="${p.upc}" value="${p.precio ?? ''}" style="width:100px;" />
-        </label>
-        <label style="font-size:12px; color:#8a7a63;">Pzas/caja<br />
-          <input type="number" step="1" min="0" class="form-field" data-campo-caja="${p.upc}" value="${p.unidades_caja ?? ''}" style="width:90px;" />
-        </label>
-        <label style="font-size:12px; color:#8a7a63;">Cajas/tarima<br />
-          <input type="number" step="1" min="0" class="form-field" data-campo-pallet="${p.upc}" value="${p.unidades_pallet ?? ''}" style="width:90px;" />
-        </label>
-        <button data-guardar-producto="${p.upc}">Guardar</button>
-      </div>
-      <p class="hint-text" data-msg-producto="${p.upc}" style="margin-top:6px;"></p>
     </div>
   `;
 }
@@ -525,12 +542,16 @@ async function guardarProductoAdminClick(upc) {
   const inputPrecio = document.querySelector(`[data-campo-precio="${upc}"]`);
   const inputCaja = document.querySelector(`[data-campo-caja="${upc}"]`);
   const inputPallet = document.querySelector(`[data-campo-pallet="${upc}"]`);
+  const inputActivo = document.querySelector(`[data-campo-activo="${upc}"]`);
   const msgEl = document.querySelector(`[data-msg-producto="${upc}"]`);
 
+  const p = productosAdmin.find((x) => x.upc === upc);
   const cambios = {};
   if (inputPrecio.value !== '') cambios.precio = Number(inputPrecio.value);
   if (inputCaja.value !== '') cambios.unidades_caja = Number(inputCaja.value);
   if (inputPallet.value !== '') cambios.unidades_pallet = Number(inputPallet.value);
+  const activoActual = p ? p.activo !== false : true;
+  if (inputActivo.checked !== activoActual) cambios.activo = inputActivo.checked;
 
   if (Object.keys(cambios).length === 0) {
     msgEl.textContent = 'No hay cambios que guardar.';
@@ -555,8 +576,11 @@ async function guardarProductoAdminClick(upc) {
 
   msgEl.textContent = '✓ Guardado';
   msgEl.style.color = '#2e7d32';
-  const p = productosAdmin.find((x) => x.upc === upc);
   if (p) Object.assign(p, cambios);
+  const card = btn.closest('.prod-admin-card');
+  if (card) card.classList.toggle('is-inactivo', inputActivo.checked === false);
+  const labelEl = document.querySelector(`[data-label-activo="${upc}"]`);
+  if (labelEl) labelEl.textContent = inputActivo.checked ? 'Activo' : 'Pausado';
   setTimeout(() => {
     if (msgEl) msgEl.textContent = '';
   }, 2500);
@@ -589,6 +613,22 @@ async function guardarProductoAdmin(upc, cambios) {
   } catch (err) {
     return { ok: false, mensaje: String(err) };
   }
+}
+
+// ============================================================
+// MODAL: imagen ampliada
+// ============================================================
+function abrirModal(id) {
+  document.getElementById(id).classList.remove('hidden');
+}
+function cerrarModal(id) {
+  document.getElementById(id).classList.add('hidden');
+}
+function abrirImagenGrande(url, nombre) {
+  const img = document.getElementById('imageZoomImg');
+  img.src = url;
+  img.alt = nombre || '';
+  abrirModal('imageZoomModal');
 }
 
 // ============================================================
@@ -659,6 +699,19 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('productosBusqueda').addEventListener('input', (e) => {
     busquedaProductosAdmin = e.target.value;
     renderProductosAdmin();
+  });
+  document.getElementById('productosFiltroActivo').addEventListener('change', (e) => {
+    filtroActivoProductos = e.target.value;
+    renderProductosAdmin();
+  });
+
+  document.querySelectorAll('[data-close]').forEach((btn) => {
+    btn.addEventListener('click', () => cerrarModal(btn.dataset.close));
+  });
+  document.querySelectorAll('.modal').forEach((modal) => {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
   });
 
   window.addEventListener('focus', () => {

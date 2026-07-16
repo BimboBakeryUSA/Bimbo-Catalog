@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v16 — corrección: se vende por caja (precio × piezas), no por pieza suelta';
+const VERSION = 'v17 — foto sin recorte + clic para ampliar imagen';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -527,7 +527,7 @@ function crearTarjetaProducto(producto) {
   image.className = 'card-image';
   if (producto.foto) {
     image.style.background = '#fff';
-    image.innerHTML = `<img src="${producto.foto}" alt="${producto.nombre}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">`;
+    image.innerHTML = `<img src="${producto.foto}" alt="${producto.nombre}" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;">`;
   } else {
     image.style.background = `linear-gradient(135deg, ${producto.color}, #ffffff)`;
     image.innerHTML = `<span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span>`;
@@ -575,7 +575,7 @@ function abrirDetalleProducto(slug) {
   if (!producto) return;
 
   const imagenHtml = producto.foto
-    ? `<div class="detail-image"><img src="${producto.foto}" alt="${producto.nombre}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;"></div>`
+    ? `<div class="detail-image" style="background:#fff;cursor:zoom-in;" onclick="abrirImagenGrande('${producto.foto.replace(/'/g, "\\'")}', '${producto.nombre.replace(/'/g, "\\'")}')"><img src="${producto.foto}" alt="${producto.nombre}" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;"></div>`
     : `<div class="detail-image" style="background:linear-gradient(135deg, ${producto.color}, #ffffff)"><span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span></div>`;
 
   // Código de barras escaneable (UPC-A de 12 dígitos), para que el cliente
@@ -852,6 +852,15 @@ function abrirModal(id) {
 }
 function cerrarModal(id) {
   document.getElementById(id).classList.add('hidden');
+}
+
+// Ver la foto del producto en grande (sin recortar), al hacer clic sobre ella
+// en el detalle del producto.
+function abrirImagenGrande(url, nombre) {
+  const img = document.getElementById('imageZoomImg');
+  img.src = url;
+  img.alt = nombre || '';
+  abrirModal('imageZoomModal');
 }
 
 // ============================================================

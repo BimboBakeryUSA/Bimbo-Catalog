@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=14" />
+<link rel="stylesheet" href="styles.css?v=15" />
 </head>
 <body>
 
@@ -97,16 +97,29 @@
         </div>
         <div class="search-toolbar">
           <input class="form-field" id="productosBusqueda" placeholder="Buscar por nombre o UPC..." />
+          <select class="form-field" id="productosFiltroActivo">
+            <option value="todos">Todos</option>
+            <option value="activo">Activos (visibles en catálogo)</option>
+            <option value="inactivo">Pausados (ocultos)</option>
+          </select>
         </div>
-        <p class="hint-text">Edita precio, piezas por caja o cajas por tarima y da clic en Guardar. Los cambios se reflejan de inmediato en el catálogo.</p>
+        <p class="hint-text">Edita precio, piezas por caja, cajas por tarima o pausa el producto (se oculta del catálogo del cliente) y da clic en Guardar. Los cambios se reflejan de inmediato.</p>
         <div id="productosWrap"></div>
       </div>
     </main>
   </div>
 
+  <!-- Modal: imagen ampliada -->
+  <div id="imageZoomModal" class="modal hidden">
+    <div class="modal-card image-zoom-card">
+      <button class="modal-close" data-close="imageZoomModal">✕</button>
+      <img id="imageZoomImg" src="" alt="" />
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="config.js?v=13"></script>
   <script src="profile-menu.js?v=12"></script>
-  <script src="admin.js?v=14"></script>
+  <script src="admin.js?v=15"></script>
 </body>
 </html>

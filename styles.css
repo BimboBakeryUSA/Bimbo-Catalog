@@ -357,6 +357,22 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 }
 .modal-close:hover { background: var(--ink); color: #fff; }
 
+/* Modal: imagen ampliada */
+.image-zoom-card {
+  max-width: 560px;
+  padding: 40px 16px 16px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.image-zoom-card img {
+  width: 100%;
+  max-height: 78vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
 /* Product detail modal */
 .detail-image {
   height: 200px;
@@ -828,3 +844,70 @@ select.form-field {
   color: var(--ink);
   white-space: nowrap;
 }
+
+/* Tarjeta de producto en el admin (Productos): foto + edición inline */
+.prod-admin-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.prod-admin-card.is-inactivo { opacity: 0.55; }
+.prod-admin-photo {
+  flex: none;
+  width: 68px;
+  height: 68px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+.prod-admin-photo img { width: 100%; height: 100%; object-fit: contain; }
+.prod-admin-photo .icon { font-size: 1.6rem; }
+.prod-admin-body { flex: 1; min-width: 0; }
+.prod-admin-fields {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  align-items: flex-end;
+}
+.prod-admin-fields label { font-size: 12px; color: var(--ink-soft); }
+.prod-admin-fields input { width: 90px; }
+
+.toggle-activo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.toggle-activo input { display: none; }
+.toggle-activo .switch {
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: #D6D7DB;
+  position: relative;
+  transition: background 0.15s ease;
+  flex: none;
+}
+.toggle-activo .switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  transition: transform 0.15s ease;
+  box-shadow: var(--shadow-sm);
+}
+.toggle-activo input:checked + .switch { background: #0F8A3D; }
+.toggle-activo input:checked + .switch::after { transform: translateX(16px); }
