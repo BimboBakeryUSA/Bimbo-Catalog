@@ -36,7 +36,7 @@ async function initProfileMenu({ linkPedidos = false, linkCatalogo = false, link
     linkPerfilEl = document.createElement('button');
     linkPerfilEl.id = 'profileLinkPerfil';
     linkPerfilEl.type = 'button';
-    linkPerfilEl.textContent = 'Mi perfil';
+    linkPerfilEl.textContent = typeof t === 'function' ? t('miPerfil') : 'Mi perfil';
     if (emailEl && emailEl.nextSibling) {
       dropdown.insertBefore(linkPerfilEl, emailEl.nextSibling);
     } else {
@@ -46,6 +46,29 @@ async function initProfileMenu({ linkPedidos = false, linkCatalogo = false, link
   linkPerfilEl.onclick = () => {
     dropdown.classList.add('hidden');
     abrirModalPerfil();
+  };
+
+  // Idioma / Language — visible "cuando entras a perfil": es un botón más
+  // del mismo menú desplegable. Al hacer clic cambia de inmediato entre
+  // español e inglés (se guarda en localStorage y se recarga la página).
+  let linkIdiomaEl = document.getElementById('profileLinkIdioma');
+  if (!linkIdiomaEl) {
+    linkIdiomaEl = document.createElement('button');
+    linkIdiomaEl.id = 'profileLinkIdioma';
+    linkIdiomaEl.type = 'button';
+    if (linkPerfilEl.nextSibling) {
+      dropdown.insertBefore(linkIdiomaEl, linkPerfilEl.nextSibling);
+    } else {
+      dropdown.appendChild(linkIdiomaEl);
+    }
+  }
+  const idiomaActual = typeof obtenerIdioma === 'function' ? obtenerIdioma() : 'es';
+  linkIdiomaEl.textContent = typeof t === 'function' ? t(idiomaActual === 'es' ? 'idiomaToggleToEn' : 'idiomaToggleToEs') : 'Language';
+  linkIdiomaEl.onclick = () => {
+    dropdown.classList.add('hidden');
+    if (typeof establecerIdioma === 'function') {
+      establecerIdioma(idiomaActual === 'es' ? 'en' : 'es');
+    }
   };
 
   btn.addEventListener('click', (e) => {
@@ -79,7 +102,7 @@ function asegurarModalPerfil() {
   modal.innerHTML = `
     <div class="modal-card">
       <button class="modal-close" type="button" id="perfilModalCerrar">✕</button>
-      <h2 style="margin:0 0 16px;">Mi perfil</h2>
+      <h2 style="margin:0 0 16px;" id="perfilModalTitulo">Mi perfil</h2>
       <input class="form-field" id="perfilTienda" placeholder="Nombre de la tienda" />
       <input class="form-field" id="perfilNombre" placeholder="Nombre de quien solicita" />
       <input class="form-field" id="perfilTelefono" placeholder="Teléfono" />
@@ -87,7 +110,7 @@ function asegurarModalPerfil() {
       <div class="form-row">
         <input class="form-field" id="perfilCiudad" placeholder="Ciudad" />
         <select class="form-field" id="perfilEstado">
-          <option value="">Estado</option>
+          <option value="" id="perfilEstadoDefault">Estado</option>
         </select>
         <input class="form-field" id="perfilZip" placeholder="ZIP" inputmode="numeric" maxlength="5" />
       </div>
@@ -96,6 +119,19 @@ function asegurarModalPerfil() {
       <button class="btn-primary" id="perfilGuardarBtn">Guardar cambios</button>
     </div>
   `;
+
+  if (typeof t === 'function') {
+    modal.querySelector('#perfilModalTitulo').textContent = t('perfilModalTitulo');
+    modal.querySelector('#perfilTienda').placeholder = t('regTiendaPh');
+    modal.querySelector('#perfilNombre').placeholder = t('regNombrePh');
+    modal.querySelector('#perfilTelefono').placeholder = t('regTelefonoPh');
+    modal.querySelector('#perfilDireccion').placeholder = t('regDireccionPh');
+    modal.querySelector('#perfilCiudad').placeholder = t('regCiudadPh');
+    modal.querySelector('#perfilEstadoDefault').textContent = t('regEstadoPh');
+    modal.querySelector('#perfilZip').placeholder = t('regZipPh');
+    modal.querySelector('#perfilOk').textContent = '✓ ' + t('perfilOk').replace(/^✓\s*/, '');
+    modal.querySelector('#perfilGuardarBtn').textContent = t('perfilGuardarBtn');
+  }
   document.body.appendChild(modal);
 
   const selectEstado = document.getElementById('perfilEstado');
@@ -136,7 +172,7 @@ async function abrirModalPerfil() {
   const btn = document.getElementById('perfilGuardarBtn');
   btn.dataset.userId = user.id;
   btn.disabled = false;
-  btn.textContent = 'Guardar cambios';
+  btn.textContent = typeof t === 'function' ? t('perfilGuardarBtn') : 'Guardar cambios';
 
   document.getElementById('perfilModal').classList.remove('hidden');
 }
@@ -166,7 +202,7 @@ async function guardarPerfilPropio() {
     !cambios.estado ||
     !cambios.zip
   ) {
-    errorEl.textContent = 'Completa todos los campos.';
+    errorEl.textContent = typeof t === 'function' ? t('perfilErrorEmpty') : 'Completa todos los campos.';
     errorEl.classList.remove('hidden');
     okEl.classList.add('hidden');
     return;
@@ -174,13 +210,13 @@ async function guardarPerfilPropio() {
   errorEl.classList.add('hidden');
 
   btn.disabled = true;
-  btn.textContent = 'Guardando...';
+  btn.textContent = typeof t === 'function' ? t('perfilGuardarBtnLoading') : 'Guardando...';
   const { error } = await supabaseClient.from('profiles').update(cambios).eq('id', userId);
   btn.disabled = false;
-  btn.textContent = 'Guardar cambios';
+  btn.textContent = typeof t === 'function' ? t('perfilGuardarBtn') : 'Guardar cambios';
 
   if (error) {
-    errorEl.textContent = 'No se pudo guardar: ' + error.message;
+    errorEl.textContent = (typeof t === 'function' ? t('perfilErrorSave') : 'No se pudo guardar: ') + error.message;
     errorEl.classList.remove('hidden');
     return;
   }

@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v17 — foto sin recorte + clic para ampliar imagen';
+const VERSION = 'v18 — idioma Español/English en menú de perfil';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -46,6 +46,13 @@ async function mostrarApp() {
     return;
   }
 
+  // El aviso de versión (para confirmar que sí cargó el código nuevo)
+  // solo le sirve al admin — a un cliente normal no le dice nada y solo
+  // estorba, así que no se le muestra.
+  if (esAdmin) {
+    alert(`Catálogo Bimbo — ${VERSION}`);
+  }
+
   document.getElementById('appShell').classList.remove('hidden');
   await cargarProductos();
   renderChips();
@@ -72,9 +79,9 @@ function mostrarPendiente() {
 function actualizarMensajePendiente() {
   const msg = document.getElementById('pendienteMensaje');
   if (perfilActual?.estado_cuenta === 'rechazado') {
-    msg.textContent = 'Tu cuenta fue rechazada. Contacta al administrador si crees que es un error.';
+    msg.textContent = t('pendienteMensajeRechazado');
   } else {
-    msg.textContent = 'Tu cuenta está pendiente de aprobación. Te avisaremos cuando puedas entrar a hacer pedidos.';
+    msg.textContent = t('pendienteMensajePendiente');
   }
 }
 
@@ -107,16 +114,16 @@ async function iniciarSesion() {
   const btn = document.getElementById('loginBtn');
 
   if (!email || !password) {
-    errorEl.textContent = 'Completa correo y contraseña.';
+    errorEl.textContent = t('loginErrorEmpty');
     errorEl.classList.remove('hidden');
     return;
   }
 
   btn.disabled = true;
-  btn.textContent = 'Entrando...';
+  btn.textContent = t('loginBtnLoading');
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   btn.disabled = false;
-  btn.textContent = 'Entrar';
+  btn.textContent = t('loginBtn');
 
   if (error) {
     errorEl.textContent = traducirErrorAuth(error);
@@ -130,21 +137,21 @@ async function iniciarSesion() {
 function traducirErrorAuth(error) {
   const msg = (error?.message || '').toLowerCase();
   if (msg.includes('already registered') || msg.includes('already exists')) {
-    return 'Ya existe una cuenta con este correo. Ve a la pestaña "Iniciar sesión" en vez de crear una nueva.';
+    return t('authErrorAlreadyRegistered');
   }
   if (msg.includes('email not confirmed') || msg.includes('not confirmed')) {
-    return 'Todavía no confirmas tu correo. Revisa tu bandeja de entrada (y spam) y da clic en el link de confirmación antes de entrar.';
+    return t('authErrorNotConfirmed');
   }
   if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
-    return 'Correo o contraseña incorrectos.';
+    return t('authErrorInvalidCreds');
   }
   if (msg.includes('rate limit') || msg.includes('security purposes') || msg.includes('seconds')) {
-    return 'Ya se pidió una cuenta con este correo hace muy poco. Espera un momento y vuelve a intentar, o revisa tu correo — el link de confirmación ya se envió.';
+    return t('authErrorRateLimit');
   }
   if (msg.includes('password')) {
-    return 'La contraseña debe tener al menos 6 caracteres.';
+    return t('authErrorPasswordLength');
   }
-  return error?.message || 'Ocurrió un error. Intenta de nuevo.';
+  return error?.message || t('authErrorGeneric');
 }
 
 async function registrarse() {
@@ -161,14 +168,14 @@ async function registrarse() {
   const btn = document.getElementById('registroBtn');
 
   if (!tienda || !nombre || !telefono || !direccion || !ciudad || !estado || !zip || !email || !password) {
-    errorEl.textContent = 'Completa todos los campos para crear tu cuenta.';
+    errorEl.textContent = t('registroErrorEmpty');
     errorEl.classList.remove('hidden');
     return;
   }
   errorEl.classList.add('hidden');
 
   btn.disabled = true;
-  btn.textContent = 'Creando...';
+  btn.textContent = t('registroBtnLoading');
   const { data, error } = await supabaseClient.auth.signUp({
     email,
     password,
@@ -177,7 +184,7 @@ async function registrarse() {
     },
   });
   btn.disabled = false;
-  btn.textContent = 'Crear cuenta';
+  btn.textContent = t('registroBtn');
 
   if (error) {
     errorEl.textContent = traducirErrorAuth(error);
@@ -189,9 +196,7 @@ async function registrarse() {
   if (data.session) {
     await cargarPerfilYEntrar();
   } else {
-    mostrarRegistroExitoso(
-      'Te mandamos un correo para confirmar tu cuenta. Una vez que lo confirmes, inicia sesión aquí — tu cuenta también deberá ser aprobada por el administrador antes de poder hacer pedidos.'
-    );
+    mostrarRegistroExitoso(t('registroExitosoMsg'));
   }
 }
 
@@ -235,6 +240,8 @@ const MARCA_DISPLAY = {
   MARINELA: 'Marinela',
   ENTENMANNS: "Entenmann's",
 };
+// Clave interna estable (no se traduce) — el texto que se muestra sale
+// de t('categoriaOtros') al momento de renderizar.
 const CATEGORIA_DEFAULT = 'Otros productos Bimbo';
 
 // Ícono representativo por marca (mientras no hay fotos reales).
@@ -245,6 +252,13 @@ const ICONOS_CATEGORIA = {
   "Entenmann's": '🍩',
   [CATEGORIA_DEFAULT]: '🍞',
 };
+
+// Texto mostrado para una categoría (traduce solo el genérico "Otros
+// productos Bimbo"; las marcas —Barcel, Bimbo, Marinela, Entenmann's—
+// se muestran igual en ambos idiomas).
+function displayCategoria(categoria) {
+  return categoria === CATEGORIA_DEFAULT ? t('categoriaOtros') : categoria;
+}
 
 // ============================================================
 // UPC COMPLETO (12 dígitos) — el precio list solo trae el código
@@ -470,7 +484,7 @@ function renderChips() {
   wrap.innerHTML = categorias
     .map(
       (cat) =>
-        `<button class="chip${cat === categoriaActiva ? ' active' : ''}" data-cat="${cat}">${cat}</button>`
+        `<button class="chip${cat === categoriaActiva ? ' active' : ''}" data-cat="${cat}">${cat === 'Todas' ? t('chipTodas') : displayCategoria(cat)}</button>`
     )
     .join('');
   wrap.querySelectorAll('.chip').forEach((btn) => {
@@ -503,7 +517,7 @@ function renderCatalogo() {
     const section = document.createElement('section');
     const titulo = document.createElement('h2');
     titulo.className = 'category-title';
-    titulo.textContent = categoria;
+    titulo.textContent = displayCategoria(categoria);
     section.appendChild(titulo);
 
     const grid = document.createElement('div');
@@ -515,7 +529,7 @@ function renderCatalogo() {
   });
 
   if (productosFiltrados.length === 0) {
-    wrap.innerHTML = '<p class="empty-state">No se encontraron productos.</p>';
+    wrap.innerHTML = `<p class="empty-state">${t('emptyState')}</p>`;
   }
 }
 
@@ -533,15 +547,15 @@ function crearTarjetaProducto(producto) {
     image.innerHTML = `<span class="icon">${ICONOS_CATEGORIA[producto.categoria] || '🍞'}</span>`;
   }
   if (producto.esHot) {
-    image.innerHTML += `<span class="card-hot-badge">🔥 Hot</span>`;
+    image.innerHTML += `<span class="card-hot-badge">${t('cardHotBadge')}</span>`;
   }
   image.onclick = () => abrirDetalleProducto(producto.slug);
 
-  const unidadLabel = producto.ventaPorCaja ? `caja de ${producto.unidadesCaja}` : 'pieza';
+  const unidadLabel = producto.ventaPorCaja ? t('unidadCaja', producto.unidadesCaja) : t('unidadPieza');
   const body = document.createElement('div');
   body.className = 'card-body';
   body.innerHTML = `
-    <span class="card-category">${producto.categoria}</span>
+    <span class="card-category">${displayCategoria(producto.categoria)}</span>
     <span class="card-name">${producto.nombre}</span>
     <div class="card-price-row">
       <div style="text-align:right;">
@@ -554,11 +568,11 @@ function crearTarjetaProducto(producto) {
 
   const btn = document.createElement('button');
   btn.className = 'card-add';
-  btn.textContent = 'Agregar';
+  btn.textContent = t('cardAdd');
   btn.onclick = () => {
     agregarAlCarrito(producto.slug);
-    btn.textContent = '¡Agregado!';
-    setTimeout(() => (btn.textContent = 'Agregar'), 1200);
+    btn.textContent = t('cardAdded');
+    setTimeout(() => (btn.textContent = t('cardAdd')), 1200);
   };
   body.appendChild(btn);
 
@@ -596,33 +610,33 @@ function abrirDetalleProducto(slug) {
       <div class="datasheet-cell">
         <span class="datasheet-icon">📦</span>
         <span class="datasheet-value">${uCaja ?? '—'}</span>
-        <span class="datasheet-label">Piezas<br>por caja</span>
+        <span class="datasheet-label">${t('datasheetPiezasCaja')}</span>
       </div>
       <div class="datasheet-cell">
         <span class="datasheet-icon">🧱</span>
         <span class="datasheet-value">${cPallet ?? '—'}</span>
-        <span class="datasheet-label">Cajas<br>por tarima</span>
+        <span class="datasheet-label">${t('datasheetCajasTarima')}</span>
       </div>
       <div class="datasheet-cell">
         <span class="datasheet-icon">🏗️</span>
         <span class="datasheet-value">${uCaja && cPallet ? uCaja * cPallet : '—'}</span>
-        <span class="datasheet-label">Piezas<br>por tarima</span>
+        <span class="datasheet-label">${t('datasheetPiezasTarima')}</span>
       </div>
     </div>
   `
       : '';
 
   const unidadLabelDetalle = producto.ventaPorCaja
-    ? `Precio por caja (${producto.unidadesCaja} pzas)`
-    : 'Precio por pieza';
+    ? t('detailPrecioCaja', producto.unidadesCaja)
+    : t('detailPrecioPieza');
 
   const body = document.getElementById('productModalBody');
   body.innerHTML = `
     ${imagenHtml}
     <div class="detail-header-row">
       <div>
-        <span class="detail-category">${producto.categoria}</span>
-        ${producto.esHot ? '<span class="detail-hot-tag">🔥 Popular</span>' : ''}
+        <span class="detail-category">${displayCategoria(producto.categoria)}</span>
+        ${producto.esHot ? `<span class="detail-hot-tag">${t('detailHotTag')}</span>` : ''}
         <h2 class="detail-name">${producto.nombre}</h2>
       </div>
       <div>
@@ -632,7 +646,7 @@ function abrirDetalleProducto(slug) {
     </div>
     ${barcodeHtml}
     ${datasheetHtml}
-    <button class="btn-primary" id="detailAddBtn">Agregar al pedido</button>
+    <button class="btn-primary" id="detailAddBtn">${t('detailAddBtn')}</button>
   `;
 
   if (producto.upcCompleto && window.JsBarcode) {
@@ -652,8 +666,8 @@ function abrirDetalleProducto(slug) {
 
   document.getElementById('detailAddBtn').onclick = (e) => {
     agregarAlCarrito(producto.slug);
-    e.target.textContent = '¡Agregado!';
-    setTimeout(() => (e.target.textContent = 'Agregar al pedido'), 1200);
+    e.target.textContent = t('detailAdded');
+    setTimeout(() => (e.target.textContent = t('detailAddBtn')), 1200);
   };
   abrirModal('productModal');
 }
@@ -665,7 +679,7 @@ function renderCartModal() {
   const body = document.getElementById('cartModalBody');
 
   if (carrito.length === 0) {
-    body.innerHTML = '<p class="empty-state">Tu pedido está vacío.</p>';
+    body.innerHTML = `<p class="empty-state">${t('cartEmpty')}</p>`;
     return;
   }
 
@@ -673,7 +687,7 @@ function renderCartModal() {
     .map(
       (item) => `
       <div class="cart-row" data-slug="${item.slug}">
-        <span class="cart-row-name">${item.nombre}<br><small class="cart-row-unidad">${item.unidad === 'caja' ? 'Caja' : 'Pieza'}</small></span>
+        <span class="cart-row-name">${item.nombre}<br><small class="cart-row-unidad">${item.unidad === 'caja' ? t('cartRowCaja') : t('cartRowPieza')}</small></span>
         <div class="qty-stepper">
           <button data-dec="${item.slug}">−</button>
           <span>${item.cantidad}</span>
@@ -686,26 +700,26 @@ function renderCartModal() {
     .join('');
 
   body.innerHTML = `
-    <h2>Tu pedido</h2>
+    <h2>${t('cartTitle')}</h2>
     ${filas}
-    <div class="cart-total"><span>Total</span><strong>$${totalCarrito().toFixed(2)}</strong></div>
+    <div class="cart-total"><span>${t('cartTotal')}</span><strong>$${totalCarrito().toFixed(2)}</strong></div>
     <div id="checkoutFormWrap">
-      <input class="form-field" id="inputTienda" placeholder="Nombre de la tienda" value="${perfilActual?.tienda_nombre || ''}" />
-      <input class="form-field" id="inputNombre" placeholder="Nombre de quien solicita" value="${perfilActual?.nombre || ''}" />
-      <input class="form-field" id="inputTelefono" placeholder="Teléfono" value="${perfilActual?.telefono || ''}" />
-      <input class="form-field" id="inputDireccion" placeholder="Dirección" value="${perfilActual?.direccion || ''}" />
+      <input class="form-field" id="inputTienda" placeholder="${t('regTiendaPh')}" value="${perfilActual?.tienda_nombre || ''}" />
+      <input class="form-field" id="inputNombre" placeholder="${t('regNombrePh')}" value="${perfilActual?.nombre || ''}" />
+      <input class="form-field" id="inputTelefono" placeholder="${t('regTelefonoPh')}" value="${perfilActual?.telefono || ''}" />
+      <input class="form-field" id="inputDireccion" placeholder="${t('regDireccionPh')}" value="${perfilActual?.direccion || ''}" />
       <div class="form-row">
-        <input class="form-field" id="inputCiudad" placeholder="Ciudad" value="${perfilActual?.ciudad || ''}" />
+        <input class="form-field" id="inputCiudad" placeholder="${t('regCiudadPh')}" value="${perfilActual?.ciudad || ''}" />
         <select class="form-field" id="inputEstado">
-          <option value="">Estado</option>
+          <option value="">${t('regEstadoPh')}</option>
           ${ESTADOS_SERVICIO.map((e) => `<option value="${e.valor}" ${perfilActual?.estado === e.valor ? 'selected' : ''}>${e.valor} — ${e.nombre}</option>`).join('')}
         </select>
-        <input class="form-field" id="inputZip" placeholder="ZIP" inputmode="numeric" maxlength="5" value="${perfilActual?.zip || ''}" />
+        <input class="form-field" id="inputZip" placeholder="${t('regZipPh')}" inputmode="numeric" maxlength="5" value="${perfilActual?.zip || ''}" />
       </div>
-      <textarea class="form-field" id="inputNotas" placeholder="Notas (opcional)" rows="2"></textarea>
-      <p id="checkoutError" class="error-text hidden">Completa todos los campos (nombre, teléfono, tienda, dirección, ciudad, estado y ZIP).</p>
-      <button class="btn-primary" id="enviarPedidoBtn">Enviar pedido</button>
-      <p class="hint-text">Tu pedido queda registrado de una vez. Compartirlo por WhatsApp es opcional.</p>
+      <textarea class="form-field" id="inputNotas" placeholder="${t('regNotasPh')}" rows="2"></textarea>
+      <p id="checkoutError" class="error-text hidden">${t('checkoutErrorMsg')}</p>
+      <button class="btn-primary" id="enviarPedidoBtn">${t('enviarPedidoBtn')}</button>
+      <p class="hint-text">${t('checkoutHint')}</p>
     </div>
   `;
 
@@ -764,7 +778,7 @@ async function enviarPedido() {
   }
   errorEl.classList.add('hidden');
   btn.disabled = true;
-  btn.textContent = 'Enviando...';
+  btn.textContent = t('enviarPedidoBtnLoading');
 
   const cliente = { tienda, nombre, telefono, direccion, ciudad, estado, zip, notas };
   const mensaje = construirMensajePedido(cliente);
@@ -822,16 +836,16 @@ async function enviarPedido() {
 function mostrarConfirmacion(mensaje) {
   const body = document.getElementById('cartModalBody');
   const botonWhatsapp = CONFIG.WHATSAPP_NUMBER
-    ? `<button class="btn-secondary" id="compartirWhatsappBtn">Compartir por WhatsApp (opcional)</button>`
+    ? `<button class="btn-secondary" id="compartirWhatsappBtn">${t('compartirWhatsapp')}</button>`
     : '';
 
   body.innerHTML = `
     <div class="confirm-state">
       <div class="confirm-icon">✓</div>
-      <h3>¡Gracias! Tu pedido quedó registrado.</h3>
-      <p>Nos pondremos en contacto contigo pronto.</p>
+      <h3>${t('confirmTitulo')}</h3>
+      <p>${t('confirmSub')}</p>
       ${botonWhatsapp}
-      <button class="btn-primary" data-close="cartModal">Seguir viendo el catálogo</button>
+      <button class="btn-primary" data-close="cartModal">${t('seguirViendoCatalogo')}</button>
     </div>
   `;
 
@@ -864,10 +878,54 @@ function abrirImagenGrande(url, nombre) {
 }
 
 // ============================================================
+// TEXTOS FIJOS — se aplican una sola vez al cargar la página, en el
+// idioma que el usuario tenga elegido (guardado en localStorage). Para
+// cambiar de idioma, el toggle en el menú de perfil recarga la página
+// (ver i18n.js / profile-menu.js), así que no hace falta re-aplicar
+// esto en caliente.
+// ============================================================
+function aplicarTraduccionesEstaticas() {
+  document.documentElement.lang = obtenerIdioma();
+
+  document.getElementById('authTabLogin').textContent = t('authTabLogin');
+  document.getElementById('authTabRegistro').textContent = t('authTabRegistro');
+  document.getElementById('loginEmail').placeholder = t('loginEmailPh');
+  document.getElementById('loginPassword').placeholder = t('loginPasswordPh');
+  document.getElementById('loginBtn').textContent = t('loginBtn');
+
+  document.getElementById('regTienda').placeholder = t('regTiendaPh');
+  document.getElementById('regNombre').placeholder = t('regNombrePh');
+  document.getElementById('regTelefono').placeholder = t('regTelefonoPh');
+  document.getElementById('regDireccion').placeholder = t('regDireccionPh');
+  document.getElementById('regCiudad').placeholder = t('regCiudadPh');
+  document.getElementById('regEstadoDefault').textContent = t('regEstadoPh');
+  document.getElementById('regZip').placeholder = t('regZipPh');
+  document.getElementById('regEmail').placeholder = t('regEmailPh');
+  document.getElementById('regPassword').placeholder = t('regPasswordPh');
+  document.getElementById('registroBtn').textContent = t('registroBtn');
+  document.getElementById('registroExitosoTitulo').textContent = t('registroExitosoTitulo');
+  document.getElementById('volverALoginBtn').textContent = t('volverALoginBtn');
+
+  document.getElementById('pendienteTitulo').textContent = t('pendienteTitulo');
+  document.getElementById('pendienteRefrescarBtn').textContent = t('pendienteRefrescarBtn');
+  document.getElementById('pendienteLogoutBtn').textContent = t('pendienteLogoutBtn');
+
+  document.getElementById('cartBtnLabel').textContent = t('cartBtnLabel');
+  document.getElementById('profileLinkPedidos').textContent = t('profileLinkPedidos');
+  document.getElementById('profileLinkMisPedidos').textContent = t('profileLinkMisPedidos');
+  document.getElementById('profileLinkCatalogo').textContent = t('profileLinkCatalogo');
+  document.getElementById('profileLogoutBtn').textContent = t('profileLogoutBtn');
+
+  document.getElementById('heroEyebrow').textContent = t('heroEyebrow');
+  document.getElementById('heroTitle').innerHTML = t('heroTitle');
+  document.getElementById('searchInput').placeholder = t('searchPh');
+}
+
+// ============================================================
 // INICIALIZACIÓN
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-  alert(`Catálogo Bimbo — ${VERSION}`);
+  aplicarTraduccionesEstaticas();
 
   // Opciones de Estado en el formulario de registro
   document.getElementById('regEstado').innerHTML +=
