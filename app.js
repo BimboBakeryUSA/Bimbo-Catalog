@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v22 — Novedades y Populares como pestañas de categoría';
+const VERSION = 'v23 — Productos fuera de tu cadena se ven pálidos';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -347,16 +347,22 @@ function mapProductoDB(row) {
   };
 }
 
-// Un producto solo es visible para clientes cuya cadena esté en su lista
-// de cadenas autorizadas (por defecto, todos los productos traen
-// "Independientes" — Doug agrega manualmente Wawa/7-Eleven/Circle K/Dash-In
-// donde corresponda). Si eres 7-Eleven, solo ves lo autorizado para
-// 7-Eleven; si eres Independiente, ves todo lo que tenga Independientes
-// (que es prácticamente todo, salvo que Doug lo quite a propósito).
-// Clientes sin cadena asignada todavía (perfilActual.cadena vacío/null)
-// ven el catálogo completo sin restricción — así nadie se queda sin poder
-// pedir mientras se le asigna una cadena.
-function productoVisibleParaCliente(producto) {
+// Un producto está DISPONIBLE PARA PEDIR solo si la cadena del cliente
+// está en su lista de cadenas autorizadas (por defecto, todos los
+// productos traen "Independientes" — Doug agrega manualmente
+// Wawa/7-Eleven/Circle K/Dash-In donde corresponda). Si eres 7-Eleven,
+// solo puedes pedir lo autorizado para 7-Eleven; si eres Independiente,
+// puedes pedir todo lo que tenga Independientes (que es prácticamente
+// todo, salvo que Doug lo quite a propósito). Clientes sin cadena
+// asignada todavía (perfilActual.cadena vacío/null) pueden pedir el
+// catálogo completo sin restricción.
+//
+// IMPORTANTE: esto YA NO filtra qué productos se cargan — todos los
+// productos se muestran siempre, para que el cliente sepa que existen
+// (aunque no pueda pedirlos). Los no disponibles para su cadena se
+// pintan "pálidos" y sin botón de Agregar (ver crearTarjetaProducto /
+// abrirDetalleProducto).
+function productoDisponibleParaCliente(producto) {
   const cadenaCliente = perfilActual?.cadena;
   if (!cadenaCliente) return true;
   return (producto.cadenasPermitidas || []).includes(cadenaCliente);
@@ -402,7 +408,10 @@ async function cargarProductos() {
       .gt('precio', 0)
       .order('ventas_totales', { ascending: false, nullsFirst: false });
     if (error) throw error;
-    PRODUCTOS = (data || []).map(mapProductoDB).filter(productoVisibleParaCliente);
+    PRODUCTOS = (data || []).map(mapProductoDB);
+    PRODUCTOS.forEach((p) => {
+      p.disponibleParaMiCadena = productoDisponibleParaCliente(p);
+    });
     marcarProductosHot(PRODUCTOS);
     localStorage.setItem(PRODUCTOS_CACHE_KEY, JSON.stringify(PRODUCTOS));
   } catch (err) {
@@ -438,6 +447,9 @@ function guardarCarrito(items) {
 function agregarAlCarrito(slug, cantidad = 1) {
   const producto = PRODUCTOS.find((p) => p.slug === slug);
   if (!producto) return;
+  // Blindaje: aunque la UI ya no muestra botón de Agregar para productos
+  // fuera de la cadena del cliente, esto evita que se cuelen por otra vía.
+  if (producto.disponibleParaMiCadena === false) return;
   const existente = carrito.find((i) => i.slug === slug);
   if (existente) {
     existente.cantidad += cantidad;
@@ -497,6 +509,15 @@ function getCategorias() {
   return [...new Set(PRODUCTOS.map((p) => p.categoria))];
 }
 
+// Dentro de cada sección, los productos que SÍ puede pedir el cliente van
+// primero — los que están fuera de su cadena (pálidos) quedan al final,
+// pero siguen apareciendo.
+function ordenarDisponiblesPrimero(productos) {
+  return productos
+    .slice()
+    .sort((a, b) => (a.disponibleParaMiCadena === false ? 1 : 0) - (b.disponibleParaMiCadena === false ? 1 : 0));
+}
+
 // "Novedades" y "Populares" son categorías especiales (no vienen de
 // products.marca): solo se agregan como chip si hay al menos un producto
 // que califique, para no mostrar una pestaña vacía.
@@ -544,7 +565,7 @@ function renderChips() {
 // de Agregar; el clic en la foto lleva directo al detalle del producto.
 function crearTileNovedad(producto) {
   const tile = document.createElement('div');
-  tile.className = 'novedad-tile';
+  tile.className = 'novedad-tile' + (producto.disponibleParaMiCadena === false ? ' no-disponible' : '');
   tile.onclick = () => abrirDetalleProducto(producto.slug);
 
   const photo = document.createElement('div');
@@ -574,7 +595,7 @@ function crearSeccionNovedades(productos) {
 
   const carrusel = document.createElement('div');
   carrusel.className = 'novedades-scroll';
-  productos.forEach((producto) => carrusel.appendChild(crearTileNovedad(producto)));
+  ordenarDisponiblesPrimero(productos).forEach((producto) => carrusel.appendChild(crearTileNovedad(producto)));
   section.appendChild(carrusel);
 
   return section;
@@ -592,7 +613,7 @@ function crearSeccionGrid(tituloTexto, productos) {
 
   const grid = document.createElement('div');
   grid.className = 'grid';
-  productos.forEach((producto) => grid.appendChild(crearTarjetaProducto(producto)));
+  ordenarDisponiblesPrimero(productos).forEach((producto) => grid.appendChild(crearTarjetaProducto(producto)));
   section.appendChild(grid);
 
   return section;
@@ -648,8 +669,10 @@ function renderCatalogo() {
 }
 
 function crearTarjetaProducto(producto) {
+  const noDisponible = producto.disponibleParaMiCadena === false;
+
   const card = document.createElement('div');
-  card.className = 'card';
+  card.className = 'card' + (noDisponible ? ' no-disponible' : '');
 
   const image = document.createElement('div');
   image.className = 'card-image';
@@ -683,15 +706,25 @@ function crearTarjetaProducto(producto) {
   `;
   body.querySelector('.card-name').onclick = () => abrirDetalleProducto(producto.slug);
 
-  const btn = document.createElement('button');
-  btn.className = 'card-add';
-  btn.textContent = t('cardAdd');
-  btn.onclick = () => {
-    agregarAlCarrito(producto.slug);
-    btn.textContent = t('cardAdded');
-    setTimeout(() => (btn.textContent = t('cardAdd')), 1200);
-  };
-  body.appendChild(btn);
+  if (noDisponible) {
+    // Sin botón de Agregar — solo un aviso. El producto sigue siendo
+    // visible (y clicable para ver el detalle), pero no se puede pedir
+    // porque no está autorizado para la cadena de este cliente.
+    const aviso = document.createElement('span');
+    aviso.className = 'card-no-disponible-label';
+    aviso.textContent = t('cardNoDisponibleLabel');
+    body.appendChild(aviso);
+  } else {
+    const btn = document.createElement('button');
+    btn.className = 'card-add';
+    btn.textContent = t('cardAdd');
+    btn.onclick = () => {
+      agregarAlCarrito(producto.slug);
+      btn.textContent = t('cardAdded');
+      setTimeout(() => (btn.textContent = t('cardAdd')), 1200);
+    };
+    body.appendChild(btn);
+  }
 
   card.appendChild(image);
   card.appendChild(body);
@@ -747,6 +780,26 @@ function abrirDetalleProducto(slug) {
     ? t('detailPrecioCaja', producto.unidadesCaja)
     : t('detailPrecioPieza');
 
+  const noDisponible = producto.disponibleParaMiCadena === false;
+
+  // Lista de cadenas donde está autorizado — así el cliente ve que existen
+  // más opciones en el catálogo, aunque su cadena no incluya este producto.
+  const cadenasHtml =
+    producto.cadenasPermitidas && producto.cadenasPermitidas.length
+      ? `
+    <div class="detail-cadenas">
+      <span class="detail-cadenas-label">${t('detailCadenasTitulo')}</span>
+      <div class="detail-cadenas-list">
+        ${producto.cadenasPermitidas.map((c) => `<span class="cadena-chip">${labelCadena(c)}</span>`).join('')}
+      </div>
+    </div>
+  `
+      : '';
+
+  const accionHtml = noDisponible
+    ? `<p class="detail-no-disponible-msg">${t('detailNoDisponibleMsg')}</p>`
+    : `<button class="btn-primary" id="detailAddBtn">${t('detailAddBtn')}</button>`;
+
   const body = document.getElementById('productModalBody');
   body.innerHTML = `
     ${imagenHtml}
@@ -754,6 +807,7 @@ function abrirDetalleProducto(slug) {
       <div>
         <span class="detail-category">${displayCategoria(producto.categoria)}</span>
         ${producto.esHot ? `<span class="detail-hot-tag">${t('detailHotTag')}</span>` : ''}
+        ${noDisponible ? `<span class="detail-lock-tag">${t('detailNoDisponibleTag')}</span>` : ''}
         <h2 class="detail-name">${producto.nombre}</h2>
       </div>
       <div>
@@ -763,7 +817,8 @@ function abrirDetalleProducto(slug) {
     </div>
     ${barcodeHtml}
     ${datasheetHtml}
-    <button class="btn-primary" id="detailAddBtn">${t('detailAddBtn')}</button>
+    ${cadenasHtml}
+    ${accionHtml}
   `;
 
   if (producto.upcCompleto && window.JsBarcode) {
@@ -781,11 +836,14 @@ function abrirDetalleProducto(slug) {
     }
   }
 
-  document.getElementById('detailAddBtn').onclick = (e) => {
-    agregarAlCarrito(producto.slug);
-    e.target.textContent = t('detailAdded');
-    setTimeout(() => (e.target.textContent = t('detailAddBtn')), 1200);
-  };
+  const detailAddBtn = document.getElementById('detailAddBtn');
+  if (detailAddBtn) {
+    detailAddBtn.onclick = (e) => {
+      agregarAlCarrito(producto.slug);
+      e.target.textContent = t('detailAdded');
+      setTimeout(() => (e.target.textContent = t('detailAddBtn')), 1200);
+    };
+  }
   abrirModal('productModal');
 }
 

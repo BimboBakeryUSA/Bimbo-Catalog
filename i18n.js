@@ -117,6 +117,10 @@ const I18N = {
     seccionNuevosTitulo: 'Novedades',
     cardNuevoBadge: '🆕 Nuevo',
     seccionPopularesTitulo: 'Populares',
+    cardNoDisponibleLabel: 'No disponible para tu cadena',
+    detailCadenasTitulo: 'Disponible en:',
+    detailNoDisponibleTag: '🔒 No disponible',
+    detailNoDisponibleMsg: 'Este producto todavía no está autorizado para tu cadena. Si te interesa, pregúntale a tu representante Bimbo.',
   },
   en: {
     authTabLogin: 'Sign in',
@@ -206,6 +210,10 @@ const I18N = {
     seccionNuevosTitulo: 'New arrivals',
     cardNuevoBadge: '🆕 New',
     seccionPopularesTitulo: 'Popular',
+    cardNoDisponibleLabel: 'Not available for your chain',
+    detailCadenasTitulo: 'Available at:',
+    detailNoDisponibleTag: '🔒 Not available',
+    detailNoDisponibleMsg: "This product isn't authorized for your chain yet. If you're interested, ask your Bimbo rep.",
   },
 };
 

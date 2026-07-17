@@ -320,6 +320,21 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 }
 .card-add:hover { background: var(--bimbo-red); color: #fff; }
 
+/* Producto fuera de la cadena del cliente: se ve, pero no se puede pedir */
+.card.no-disponible { opacity: 0.5; filter: grayscale(55%); }
+.card-no-disponible-label {
+  display: block;
+  margin-top: 10px;
+  padding: 9px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+}
+.novedad-tile.no-disponible { opacity: 0.5; filter: grayscale(55%); }
+
 /* Modal */
 .modal {
   position: fixed;
@@ -407,6 +422,27 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   margin-bottom: 4px;
 }
 .detail-hot-tag { margin-left: 8px; font-size: 0.68rem; font-weight: 800; color: var(--bimbo-red); }
+.detail-lock-tag { margin-left: 8px; font-size: 0.68rem; font-weight: 800; color: var(--bimbo-navy); }
+.detail-cadenas { margin-top: 16px; }
+.detail-cadenas-label { display: block; margin-bottom: 6px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 700; }
+.detail-cadenas-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.cadena-chip {
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 11px;
+  border-radius: 999px;
+}
+.detail-no-disponible-msg {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
 .detail-price {
   font-size: 1.3rem;
   font-weight: 800;
