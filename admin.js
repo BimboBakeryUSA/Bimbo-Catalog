@@ -404,8 +404,11 @@ function tarjetaUsuario(u) {
     }
   }
 
+  // La cadena solo aplica a clientes (deciden qué pueden pedir) — un
+  // corporativo (vendedor/MSL/ZSL) no hace pedidos, así que no le
+  // corresponde este selector.
   const cadenaHtml =
-    u.role !== 'admin'
+    u.role === 'cliente'
       ? `
       <div class="order-meta" style="margin-top:6px;">
         Cadena:
@@ -418,6 +421,8 @@ function tarjetaUsuario(u) {
       </div>`
       : '';
 
+  const etiquetaBadge = u.role === 'admin' ? 'admin' : u.role === 'corporativo' ? `corporativo · ${u.estado_cuenta}` : u.estado_cuenta;
+
   return `
     <div class="order-card ${u.estado_cuenta === 'pendiente' ? 'is-nuevo' : ''}">
       <div class="order-head">
@@ -427,7 +432,7 @@ function tarjetaUsuario(u) {
           <div class="order-meta">${u.email || ''}</div>
           <div class="order-meta">${u.direccion || ''}${u.ciudad ? ', ' + u.ciudad : ''}${u.estado ? ', ' + u.estado : ''} ${u.zip || ''}</div>
           <div class="order-meta">Registrado: ${fecha}</div>
-          <span class="order-badge ${u.role === 'admin' ? 'admin' : u.estado_cuenta}">${u.role === 'admin' ? 'admin' : u.estado_cuenta}</span>
+          <span class="order-badge ${u.role === 'admin' ? 'admin' : u.estado_cuenta}">${etiquetaBadge}</span>
           ${cadenaHtml}
         </div>
       </div>
@@ -467,6 +472,149 @@ function suscribirseAUsuarios() {
       cargarUsuarios();
     })
     .subscribe();
+}
+
+// ============================================================
+// CREAR USUARIO (cliente o corporativo) directo desde el panel —
+// vía Edge Function admin-create-user (queda aprobado de inmediato,
+// sin pasar por la lista de pendientes). Dos formas de darle acceso:
+// que Supabase le mande invitación por correo, o que el admin le
+// ponga la contraseña aquí mismo y se la comparta directo.
+// ============================================================
+function abrirModalCrearUsuario() {
+  document.getElementById('nuevoUsuarioTipo').value = 'cliente';
+  document.getElementById('nuevoUsuarioNombre').value = '';
+  document.getElementById('nuevoUsuarioTelefono').value = '';
+  document.getElementById('nuevoUsuarioEmail').value = '';
+  document.getElementById('nuevoUsuarioTienda').value = '';
+  document.getElementById('nuevoUsuarioDireccion').value = '';
+  document.getElementById('nuevoUsuarioCiudad').value = '';
+  document.getElementById('nuevoUsuarioEstado').value = '';
+  document.getElementById('nuevoUsuarioZip').value = '';
+  document.getElementById('nuevoUsuarioCadena').value = '';
+  document.getElementById('nuevoUsuarioAcceso').value = 'password';
+  document.getElementById('nuevoUsuarioPassword').value = '';
+  const msgEl = document.getElementById('crearUsuarioMsg');
+  msgEl.textContent = '';
+  msgEl.style.color = '';
+  actualizarCamposCrearUsuario();
+  abrirModal('crearUsuarioModal');
+}
+
+// Los campos de tienda/dirección/cadena solo aplican a "Cliente" (son
+// para hacer pedidos); el campo de contraseña solo aplica si el admin
+// elige ponerla él mismo en vez de mandar invitación por correo.
+function actualizarCamposCrearUsuario() {
+  const esCliente = document.getElementById('nuevoUsuarioTipo').value === 'cliente';
+  document.getElementById('nuevoUsuarioClienteFields').classList.toggle('hidden', !esCliente);
+  const esPassword = document.getElementById('nuevoUsuarioAcceso').value === 'password';
+  document.getElementById('nuevoUsuarioPassword').classList.toggle('hidden', !esPassword);
+}
+
+async function crearUsuarioClick() {
+  const btn = document.getElementById('crearUsuarioBtn');
+  const msgEl = document.getElementById('crearUsuarioMsg');
+
+  const tipo = document.getElementById('nuevoUsuarioTipo').value;
+  const nombre = document.getElementById('nuevoUsuarioNombre').value.trim();
+  const telefono = document.getElementById('nuevoUsuarioTelefono').value.trim();
+  const email = document.getElementById('nuevoUsuarioEmail').value.trim();
+  const tienda_nombre = document.getElementById('nuevoUsuarioTienda').value.trim();
+  const direccion = document.getElementById('nuevoUsuarioDireccion').value.trim();
+  const ciudad = document.getElementById('nuevoUsuarioCiudad').value.trim();
+  const estado = document.getElementById('nuevoUsuarioEstado').value.trim();
+  const zip = document.getElementById('nuevoUsuarioZip').value.trim();
+  const cadena = document.getElementById('nuevoUsuarioCadena').value.trim();
+  const acceso = document.getElementById('nuevoUsuarioAcceso').value;
+  const password = document.getElementById('nuevoUsuarioPassword').value;
+
+  if (!nombre || !email) {
+    msgEl.textContent = 'Completa al menos nombre y correo.';
+    msgEl.style.color = '#c0392b';
+    return;
+  }
+  if (tipo === 'cliente' && (!tienda_nombre || !direccion || !ciudad || !estado || !zip)) {
+    msgEl.textContent = 'Para un cliente, completa también tienda, dirección, ciudad, estado y ZIP.';
+    msgEl.style.color = '#c0392b';
+    return;
+  }
+  const enviarInvitacion = acceso === 'invitar';
+  if (!enviarInvitacion && (!password || password.length < 6)) {
+    msgEl.textContent = 'Escribe una contraseña de al menos 6 caracteres, o cambia a "Enviarle invitación".';
+    msgEl.style.color = '#c0392b';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Creando...';
+  msgEl.textContent = '';
+  msgEl.style.color = '';
+
+  const {
+    data: { session },
+  } = await supabaseClient.auth.getSession();
+  const token = session?.access_token;
+  if (!token) {
+    msgEl.textContent = 'Sesión expirada, vuelve a iniciar sesión.';
+    msgEl.style.color = '#c0392b';
+    btn.disabled = false;
+    btn.textContent = 'Crear usuario';
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('admin-create-user', {
+      body: {
+        tipo,
+        nombre,
+        telefono,
+        email,
+        tienda_nombre: tipo === 'cliente' ? tienda_nombre : '',
+        direccion: tipo === 'cliente' ? direccion : '',
+        ciudad: tipo === 'cliente' ? ciudad : '',
+        estado: tipo === 'cliente' ? estado : '',
+        zip: tipo === 'cliente' ? zip : '',
+        cadena: tipo === 'cliente' ? cadena : '',
+        enviar_invitacion: enviarInvitacion,
+        password: enviarInvitacion ? undefined : password,
+      },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'Crear usuario';
+
+    if (error) {
+      let mensaje = error.message || 'Error creando el usuario';
+      try {
+        const ctx = await error.context?.json?.();
+        if (ctx?.error) mensaje = ctx.error;
+      } catch {
+        // si no se puede leer el detalle, se queda con el mensaje genérico
+      }
+      msgEl.textContent = '✕ ' + mensaje;
+      msgEl.style.color = '#c0392b';
+      return;
+    }
+    if (data?.error) {
+      msgEl.textContent = '✕ ' + data.error;
+      msgEl.style.color = '#c0392b';
+      return;
+    }
+
+    if (enviarInvitacion) {
+      msgEl.textContent = `✓ Cuenta creada y aprobada. Se le mandó un correo de invitación a ${email} para que ponga su contraseña.`;
+    } else {
+      msgEl.textContent = `✓ Cuenta creada y aprobada. Usuario: ${email} — Contraseña: ${password} (cópiala, no se vuelve a mostrar).`;
+    }
+    msgEl.style.color = '#2e7d32';
+    cargarUsuarios();
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Crear usuario';
+    msgEl.textContent = '✕ ' + String(err);
+    msgEl.style.color = '#c0392b';
+  }
 }
 
 function cambiarPanelAdmin(panel) {
@@ -706,6 +854,16 @@ function poblarSelectsEstadoUS() {
   const opciones = ESTADOS_SERVICIO.map((e) => `<option value="${e.valor}">${e.nombre}</option>`).join('');
   document.getElementById('pedidosFiltroEstadoUS').insertAdjacentHTML('beforeend', opciones);
   document.getElementById('usuariosFiltroEstadoUS').insertAdjacentHTML('beforeend', opciones);
+
+  // El de "Crear usuario" es para captura de datos reales (no filtro),
+  // así que muestra código + nombre completo, igual que en el registro.
+  const opcionesCompletas = ESTADOS_SERVICIO.map((e) => `<option value="${e.valor}">${e.valor} — ${e.nombre}</option>`).join('');
+  document.getElementById('nuevoUsuarioEstado').insertAdjacentHTML('beforeend', opcionesCompletas);
+
+  const opcionesCadena = (typeof CADENAS !== 'undefined' ? CADENAS : [])
+    .map((c) => `<option value="${c}">${typeof labelCadena === 'function' ? labelCadena(c) : c}</option>`)
+    .join('');
+  document.getElementById('nuevoUsuarioCadena').insertAdjacentHTML('beforeend', opcionesCadena);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -763,6 +921,11 @@ document.addEventListener('DOMContentLoaded', () => {
     filtroZipUsuarios = e.target.value;
     renderUsuarios();
   });
+
+  document.getElementById('abrirCrearUsuarioBtn').addEventListener('click', abrirModalCrearUsuario);
+  document.getElementById('nuevoUsuarioTipo').addEventListener('change', actualizarCamposCrearUsuario);
+  document.getElementById('nuevoUsuarioAcceso').addEventListener('change', actualizarCamposCrearUsuario);
+  document.getElementById('crearUsuarioBtn').addEventListener('click', crearUsuarioClick);
 
   document.getElementById('productosBusqueda').addEventListener('input', (e) => {
     busquedaProductosAdmin = e.target.value;

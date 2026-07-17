@@ -81,6 +81,7 @@
             <button class="chip" data-filtro="aprobado">Aprobados</button>
           </div>
         </div>
+        <button class="btn-primary" id="abrirCrearUsuarioBtn" style="margin-bottom:12px;">+ Crear usuario</button>
         <div class="search-toolbar">
           <input class="form-field" id="usuariosBusqueda" placeholder="Buscar por nombre, teléfono o correo..." />
           <select class="form-field" id="usuariosFiltroEstadoUS">
@@ -117,10 +118,52 @@
     </div>
   </div>
 
+  <!-- Modal: crear usuario (cliente o corporativo) directo desde el panel.
+       Queda aprobado de inmediato, sin pasar por la lista de pendientes. -->
+  <div id="crearUsuarioModal" class="modal hidden">
+    <div class="modal-card">
+      <button class="modal-close" data-close="crearUsuarioModal">✕</button>
+      <h2>Crear usuario</h2>
+      <p class="hint-text" style="margin-top:0;">Queda aprobado de inmediato, sin pasar por pendientes.</p>
+
+      <select class="form-field" id="nuevoUsuarioTipo">
+        <option value="cliente">Cliente (hace pedidos)</option>
+        <option value="corporativo">Corporativo (vendedor, MSL, ZSL...)</option>
+      </select>
+      <input class="form-field" id="nuevoUsuarioNombre" placeholder="Nombre" />
+      <input class="form-field" id="nuevoUsuarioTelefono" placeholder="Teléfono" />
+      <input class="form-field" id="nuevoUsuarioEmail" type="email" placeholder="Correo" autocomplete="off" />
+
+      <div id="nuevoUsuarioClienteFields">
+        <input class="form-field" id="nuevoUsuarioTienda" placeholder="Nombre de la tienda" />
+        <input class="form-field" id="nuevoUsuarioDireccion" placeholder="Dirección" />
+        <div class="form-row">
+          <input class="form-field" id="nuevoUsuarioCiudad" placeholder="Ciudad" />
+          <select class="form-field" id="nuevoUsuarioEstado">
+            <option value="">Estado</option>
+          </select>
+          <input class="form-field" id="nuevoUsuarioZip" placeholder="ZIP" inputmode="numeric" maxlength="5" />
+        </div>
+        <select class="form-field" id="nuevoUsuarioCadena">
+          <option value="">Cadena (sin asignar — ve todo)</option>
+        </select>
+      </div>
+
+      <select class="form-field" id="nuevoUsuarioAcceso">
+        <option value="password">Yo le pongo la contraseña</option>
+        <option value="invitar">Enviarle invitación por correo</option>
+      </select>
+      <input class="form-field" id="nuevoUsuarioPassword" type="text" placeholder="Contraseña (mínimo 6 caracteres)" />
+
+      <p id="crearUsuarioMsg" class="hint-text" style="margin-top:8px;"></p>
+      <button class="btn-primary" id="crearUsuarioBtn">Crear usuario</button>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="i18n.js?v=3"></script>
   <script src="config.js?v=13"></script>
   <script src="profile-menu.js?v=15"></script>
-  <script src="admin.js?v=17"></script>
+  <script src="admin.js?v=18"></script>
 </body>
 </html>
