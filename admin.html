@@ -15,12 +15,12 @@
   <div id="loginView" class="admin-login-screen">
     <div class="login-card">
       <span class="hero-eyebrow">Panel Bimbo</span>
-      <h1 class="login-title">Acceso admin</h1>
+      <h1 class="login-title" id="loginAdminTitulo">Acceso admin</h1>
       <input class="form-field" id="loginEmail" type="email" placeholder="Correo" autocomplete="username" />
       <input class="form-field" id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password" />
       <p id="loginError" class="error-text hidden"></p>
       <button class="btn-primary" id="loginBtn">Entrar</button>
-      <p class="hint-text"><a href="index.html">← Volver al catálogo</a></p>
+      <p class="hint-text"><a href="index.html" id="loginVolverCatalogo">← Volver al catálogo</a></p>
     </div>
   </div>
 
@@ -28,7 +28,10 @@
   <div id="ordersView" class="hidden">
     <header class="topbar">
       <div class="topbar-inner">
-        <span class="brand">Panel <strong>Bimbo</strong></span>
+        <div class="topbar-left">
+          <button class="sidebar-open-btn" id="sidebarOpenBtn" aria-label="Abrir menú">☰</button>
+          <span class="brand">Panel <strong>Bimbo</strong></span>
+        </div>
         <div id="profileWrap" class="profile-wrap hidden">
           <button id="profileBtn" class="profile-btn" aria-label="Perfil">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
@@ -42,16 +45,15 @@
       </div>
     </header>
     <div class="admin-layout">
-      <button class="sidebar-open-btn" id="sidebarOpenBtn" aria-label="Abrir menú">☰ Menú</button>
       <div class="admin-sidebar-backdrop" id="adminSidebarBackdrop"></div>
 
       <aside class="admin-sidebar" id="adminSidebar">
         <nav class="admin-nav">
           <button class="admin-nav-item active" data-panel="pedidos" id="tabPedidos">Pedidos</button>
-          <button class="admin-nav-item" data-panel="usuarios">
-            Usuarios <span id="pendientesBadge" class="cart-badge hidden" style="position:static; margin-left:4px;">0</span>
+          <button class="admin-nav-item" data-panel="usuarios" id="tabUsuarios">
+            <span id="navUsuariosLabel">Usuarios</span> <span id="pendientesBadge" class="cart-badge hidden" style="position:static; margin-left:4px;">0</span>
           </button>
-          <button class="admin-nav-item" data-panel="productos">Productos</button>
+          <button class="admin-nav-item" data-panel="productos" id="tabProductos">Productos</button>
           <button class="admin-nav-item" data-panel="reportes" id="tabReportes">Reportes</button>
           <button class="admin-nav-item" data-panel="estantes" id="tabEstantes">Estantes</button>
           <button class="admin-nav-item" data-panel="actividad" id="tabActividad">Actividad</button>
@@ -63,18 +65,18 @@
 
       <div id="panelPedidos">
         <div class="orders-toolbar">
-          <h1 class="orders-title">Pedidos</h1>
+          <h1 class="orders-title" id="tituloPedidosPanel">Pedidos</h1>
           <div class="orders-filter" id="ordersFilter">
-            <button class="chip active" data-estado="todos">Todos</button>
-            <button class="chip" data-estado="nuevo">Nuevos</button>
-            <button class="chip" data-estado="visto">Vistos</button>
-            <button class="chip" data-estado="completado">Completados</button>
+            <button class="chip active" data-estado="todos" id="chipPedidosTodos">Todos</button>
+            <button class="chip" data-estado="nuevo" id="chipPedidosNuevos">Nuevos</button>
+            <button class="chip" data-estado="visto" id="chipPedidosVistos">Vistos</button>
+            <button class="chip" data-estado="completado" id="chipPedidosCompletados">Completados</button>
           </div>
         </div>
         <div class="search-toolbar">
           <input class="form-field" id="pedidosBusqueda" placeholder="Buscar por nombre, teléfono o correo..." />
           <select class="form-field" id="pedidosFiltroEstadoUS">
-            <option value="">Estado (todos)</option>
+            <option value="" id="pedidosFiltroEstadoUSDefault">Estado (todos)</option>
           </select>
           <input class="form-field" id="pedidosFiltroZip" placeholder="ZIP" inputmode="numeric" maxlength="5" />
         </div>
@@ -83,18 +85,20 @@
 
       <div id="panelUsuarios" class="hidden">
         <div class="orders-toolbar">
-          <h1 class="orders-title">Usuarios</h1>
+          <h1 class="orders-title" id="tituloUsuariosPanel">Usuarios</h1>
           <div class="orders-filter" id="usuariosFilter">
-            <button class="chip active" data-filtro="todos">Todos</button>
-            <button class="chip" data-filtro="pendiente">Pendientes</button>
-            <button class="chip" data-filtro="aprobado">Aprobados</button>
+            <button class="chip active" data-filtro="todos" id="chipUsuariosTodos">Todos</button>
+            <button class="chip" data-filtro="pendiente" id="chipUsuariosPendientes">Pendientes</button>
+            <button class="chip" data-filtro="aprobado" id="chipUsuariosAprobados">Aprobados</button>
           </div>
         </div>
-        <button class="btn-primary" id="abrirCrearUsuarioBtn" style="margin-bottom:12px;">+ Crear usuario</button>
+        <button class="btn-primary" id="abrirCrearUsuarioBtn" style="margin-bottom:12px;">
+          <span id="btnCrearUsuarioAdminLabel">+ Crear usuario</span>
+        </button>
         <div class="search-toolbar">
           <input class="form-field" id="usuariosBusqueda" placeholder="Buscar por nombre, teléfono o correo..." />
           <select class="form-field" id="usuariosFiltroEstadoUS">
-            <option value="">Estado (todos)</option>
+            <option value="" id="usuariosFiltroEstadoUSDefault">Estado (todos)</option>
           </select>
           <input class="form-field" id="usuariosFiltroZip" placeholder="ZIP" inputmode="numeric" maxlength="5" />
         </div>
@@ -103,54 +107,54 @@
 
       <div id="panelProductos" class="hidden">
         <div class="orders-toolbar">
-          <h1 class="orders-title">Productos</h1>
+          <h1 class="orders-title" id="tituloProductosPanel">Productos</h1>
         </div>
         <button class="btn-primary" id="abrirCategoriasBtn" style="margin-bottom:12px;">Gestionar categorías</button>
         <div class="search-toolbar">
           <input class="form-field" id="productosBusqueda" placeholder="Buscar por nombre o UPC..." />
           <select class="form-field" id="productosFiltroActivo">
-            <option value="todos">Todos</option>
-            <option value="activo">Activos (visibles en catálogo)</option>
-            <option value="inactivo">Pausados (ocultos)</option>
+            <option value="todos" id="productosFiltroTodosOpt">Todos</option>
+            <option value="activo" id="productosFiltroActivoOpt">Activos (visibles en catálogo)</option>
+            <option value="inactivo" id="productosFiltroInactivoOpt">Pausados (ocultos)</option>
           </select>
         </div>
-        <p class="hint-text">Edita precio, piezas por caja, cajas por tarima, pausa el producto, márcalo como "Nuevo" (aparece en Novedades del catálogo) o agrega las cadenas donde está autorizado además de Independientes (por defecto solo lo ven clientes Independientes), y da clic en Guardar. Los cambios se reflejan de inmediato.</p>
+        <p class="hint-text" id="hintProductosAdmin">Edita precio, piezas por caja, cajas por tarima, pausa el producto, márcalo como "Nuevo" (aparece en Novedades del catálogo) o agrega las cadenas donde está autorizado además de Independientes (por defecto solo lo ven clientes Independientes), y da clic en Guardar. Los cambios se reflejan de inmediato.</p>
         <div id="productosWrap"></div>
       </div>
 
       <div id="panelReportes" class="hidden">
         <div class="orders-toolbar">
-          <h1 class="orders-title">Reportes</h1>
+          <h1 class="orders-title" id="tituloReportesPanel">Reportes</h1>
         </div>
-        <p class="hint-text">Ventas de tu equipo, agrupadas por IBP. Cada MSL/ZSL solo ve a su propio equipo; el admin ve todo.</p>
+        <p class="hint-text" id="hintReportesAdmin">Ventas de tu equipo, agrupadas por IBP. Cada MSL/ZSL solo ve a su propio equipo; el admin ve todo.</p>
         <div id="reportesWrap"></div>
       </div>
 
       <div id="panelEstantes" class="hidden">
         <div class="orders-toolbar">
-          <h1 class="orders-title">Estantes (muebles)</h1>
+          <h1 class="orders-title" id="tituloEstantesPanelH1">Estantes (muebles)</h1>
         </div>
-        <p class="hint-text" style="margin-top:0;">Sección informativa del catálogo — el cliente ve fotos y descripción, pero no puede comprar, solo "Solicitar información".</p>
+        <p class="hint-text" style="margin-top:0;" id="hintEstantesAdmin">Sección informativa del catálogo — el cliente ve fotos y descripción, pero no puede comprar, solo "Solicitar información".</p>
         <button class="btn-primary" id="abrirMuebleNuevoBtn" style="margin-bottom:12px;">+ Agregar mueble</button>
         <div id="mueblesAdminWrap"></div>
 
-        <h2 class="category-title" style="margin-top:28px;">Solicitudes de información</h2>
+        <h2 class="category-title" style="margin-top:28px;" id="tituloSolicitudesMueble">Solicitudes de información</h2>
         <div id="solicitudesMuebleWrap"></div>
       </div>
 
       <div id="panelActividad" class="hidden">
         <div class="orders-toolbar">
-          <h1 class="orders-title">Actividad</h1>
+          <h1 class="orders-title" id="tituloActividadPanel">Actividad</h1>
         </div>
-        <p class="hint-text" style="margin-top:0;">Solo tú ves esto. Basado en los últimos eventos registrados (búsquedas y productos vistos).</p>
+        <p class="hint-text" style="margin-top:0;" id="hintActividadAdmin">Solo tú ves esto. Basado en los últimos eventos registrados (búsquedas y productos vistos).</p>
 
-        <h2 class="category-title">Búsquedas más frecuentes</h2>
+        <h2 class="category-title" id="tituloBusquedasFrecuentes">Búsquedas más frecuentes</h2>
         <div id="actividadBusquedasWrap"></div>
 
-        <h2 class="category-title" style="margin-top:24px;">Productos más vistos</h2>
+        <h2 class="category-title" style="margin-top:24px;" id="tituloProductosVistos">Productos más vistos</h2>
         <div id="actividadVistosWrap"></div>
 
-        <h2 class="category-title" style="margin-top:24px;">Último acceso por usuario</h2>
+        <h2 class="category-title" style="margin-top:24px;" id="tituloUltimoAccesoUsuario">Último acceso por usuario</h2>
         <div id="actividadUltimoAccesoWrap"></div>
       </div>
     </main>
@@ -170,8 +174,8 @@
   <div id="crearUsuarioModal" class="modal hidden">
     <div class="modal-card">
       <button class="modal-close" data-close="crearUsuarioModal">✕</button>
-      <h2>Crear usuario</h2>
-      <p class="hint-text" style="margin-top:0;">Queda aprobado de inmediato, sin pasar por pendientes.</p>
+      <h2 id="modalCrearUsuarioTitulo">Crear usuario</h2>
+      <p class="hint-text" style="margin-top:0;" id="modalCrearUsuarioHint">Queda aprobado de inmediato, sin pasar por pendientes.</p>
 
       <select class="form-field" id="nuevoUsuarioTipo">
         <option value="cliente">Cliente (hace pedidos)</option>
@@ -217,7 +221,9 @@
       </div>
 
       <p id="crearUsuarioMsg" class="hint-text" style="margin-top:8px;"></p>
-      <button class="btn-primary" id="crearUsuarioBtn">Crear usuario</button>
+      <button class="btn-primary" id="crearUsuarioBtn">
+        <span id="btnCrearUsuarioAdminLabel2">Crear usuario</span>
+      </button>
     </div>
   </div>
 
@@ -226,7 +232,7 @@
   <div id="resetearAccesoModal" class="modal hidden">
     <div class="modal-card">
       <button class="modal-close" data-close="resetearAccesoModal">✕</button>
-      <h2>Resetear acceso</h2>
+      <h2 id="modalResetearTitulo">Resetear acceso</h2>
       <p class="hint-text" style="margin-top:0;" id="resetearAccesoEmail"></p>
 
       <select class="form-field" id="resetearAccesoTipo">
@@ -240,6 +246,7 @@
 
       <p id="resetearAccesoMsg" class="hint-text" style="margin-top:8px;"></p>
       <button class="btn-primary" id="resetearAccesoBtn">Confirmar</button>
+      <!-- id=resetearAccesoBtn translated via btnConfirmarAdmin key -->
     </div>
   </div>
 
@@ -256,7 +263,7 @@
         <label class="toggle-activo" style="flex:0 0 auto;">
           <input type="checkbox" id="muebleActivo" checked />
           <span class="switch"></span>
-          <span>Activo</span>
+          <span id="muebleActivoLabel">Activo</span>
         </label>
       </div>
       <p id="muebleFormMsg" class="hint-text" style="margin-top:8px;"></p>
@@ -268,8 +275,8 @@
   <div id="categoriasModal" class="modal hidden">
     <div class="modal-card">
       <button class="modal-close" data-close="categoriasModal">✕</button>
-      <h2>Categorías</h2>
-      <p class="hint-text" style="margin-top:0;">Se usan para armar los chips del catálogo. "Otros productos Bimbo" y "Estantes" son fijas y no aparecen aquí.</p>
+      <h2 id="modalCategoriasTitulo">Categorías</h2>
+      <p class="hint-text" style="margin-top:0;" id="modalCategoriasHint">Se usan para armar los chips del catálogo. "Otros productos Bimbo" y "Estantes" son fijas y no aparecen aquí.</p>
       <div id="categoriasListWrap"></div>
       <div class="form-row" style="margin-top:12px;">
         <input class="form-field" id="categoriaNuevaNombre" placeholder="Nueva categoría" style="flex:1;" />
@@ -280,9 +287,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="i18n.js?v=6"></script>
+  <script src="i18n.js?v=7"></script>
   <script src="config.js?v=13"></script>
   <script src="profile-menu.js?v=16"></script>
-  <script src="admin.js?v=27"></script>
+  <script src="admin.js?v=28"></script>
 </body>
 </html>

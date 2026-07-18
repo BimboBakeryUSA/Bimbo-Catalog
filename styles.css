@@ -55,6 +55,12 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 }
 .brand strong { color: var(--bimbo-red); }
 
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .topbar-actions {
   display: flex;
   align-items: center;
@@ -832,25 +838,26 @@ select.form-field {
 
 .sidebar-open-btn {
   display: none;
+  width: 36px;
+  height: 36px;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   border: 1px solid var(--line);
-  background: #fff;
-  padding: 10px 16px;
-  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border-radius: 999px;
   font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: 1.1rem;
+  line-height: 1;
   color: var(--ink);
   cursor: pointer;
-  margin-bottom: 16px;
+  flex: 0 0 auto;
 }
 
 .admin-sidebar-backdrop { display: none; }
 
 @media (max-width: 860px) {
   .admin-layout { padding: 20px 16px 60px; flex-direction: column; gap: 0; }
-  .sidebar-open-btn { display: inline-flex; }
+  .sidebar-open-btn { display: flex; }
 
   .admin-sidebar {
     position: fixed;

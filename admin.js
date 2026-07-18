@@ -1410,7 +1410,7 @@ function abrirModalMueble(id) {
   muebleEditandoId = id || null;
   const mueble = id ? mueblesAdmin.find((m) => m.id === id) : null;
 
-  document.getElementById('muebleFormTitulo').textContent = mueble ? 'Editar mueble' : 'Agregar mueble';
+  document.getElementById('muebleFormTitulo').textContent = mueble ? t('modalMuebleEditarTitulo') : t('modalMuebleAgregarTitulo');
   document.getElementById('muebleNombre').value = mueble?.nombre || '';
   document.getElementById('muebleDescripcion').value = mueble?.descripcion || '';
   document.getElementById('muebleFotos').value = (mueble?.fotos || []).join('\n');
@@ -1749,9 +1749,106 @@ function poblarSelectsEstadoUS() {
   document.getElementById('nuevoUsuarioCadena').insertAdjacentHTML('beforeend', opcionesCadena);
 }
 
+function aplicarIdiomaAdminEstatico() {
+  if (typeof t !== 'function') return;
+  const setText = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = t(key);
+  };
+  const setPh = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.placeholder = t(key);
+  };
+
+  // Login
+  setText('loginAdminTitulo', 'adminAccesoTitulo');
+  setText('loginVolverCatalogo', 'adminVolverCatalogo');
+
+  // Sidebar / nav
+  setText('tabPedidos', 'navPedidos');
+  setText('navUsuariosLabel', 'navUsuarios');
+  setText('tabProductos', 'navProductos');
+  setText('tabReportes', 'navReportes');
+  setText('tabEstantes', 'navEstantes');
+  setText('tabActividad', 'navActividad');
+
+  // Pedidos
+  setText('tituloPedidosPanel', 'navPedidos');
+  setText('chipPedidosTodos', 'adminChipTodos');
+  setText('chipPedidosNuevos', 'chipNuevos');
+  setText('chipPedidosVistos', 'chipVistos');
+  setText('chipPedidosCompletados', 'chipCompletados');
+  setPh('pedidosBusqueda', 'searchPedidosPh');
+  setText('pedidosFiltroEstadoUSDefault', 'estadoTodosOpt');
+
+  // Usuarios
+  setText('tituloUsuariosPanel', 'navUsuarios');
+  setText('chipUsuariosTodos', 'adminChipTodos');
+  setText('chipUsuariosPendientes', 'chipPendientes');
+  setText('chipUsuariosAprobados', 'chipAprobados');
+  setText('btnCrearUsuarioAdminLabel', 'btnCrearUsuarioAdmin');
+  setPh('usuariosBusqueda', 'searchPedidosPh');
+  setText('usuariosFiltroEstadoUSDefault', 'estadoTodosOpt');
+
+  // Productos
+  setText('tituloProductosPanel', 'navProductos');
+  setText('abrirCategoriasBtn', 'btnGestionarCategorias');
+  setPh('productosBusqueda', 'searchProductosPh');
+  setText('productosFiltroTodosOpt', 'adminChipTodos');
+  setText('productosFiltroActivoOpt', 'productosFiltroActivoOpt');
+  setText('productosFiltroInactivoOpt', 'productosFiltroInactivoOpt');
+  setText('hintProductosAdmin', 'hintProductosAdmin');
+
+  // Reportes
+  setText('tituloReportesPanel', 'navReportes');
+  setText('hintReportesAdmin', 'hintReportesAdmin');
+
+  // Estantes
+  setText('tituloEstantesPanelH1', 'tituloEstantesPanel');
+  setText('hintEstantesAdmin', 'hintEstantesAdmin');
+  setText('abrirMuebleNuevoBtn', 'btnAgregarMueble');
+  setText('tituloSolicitudesMueble', 'subtituloSolicitudes');
+
+  // Actividad
+  setText('tituloActividadPanel', 'navActividad');
+  setText('hintActividadAdmin', 'hintActividadAdmin');
+  setText('tituloBusquedasFrecuentes', 'subtituloBusquedas');
+  setText('tituloProductosVistos', 'subtituloVistos');
+  setText('tituloUltimoAccesoUsuario', 'subtituloUltimoAcceso');
+
+  // Banner
+  setText('newOrderBanner', 'bannerNuevoPedido');
+
+  // Modal: crear usuario
+  setText('modalCrearUsuarioTitulo', 'modalCrearUsuarioTitulo');
+  setText('modalCrearUsuarioHint', 'modalCrearUsuarioHint');
+  setText('btnCrearUsuarioAdminLabel2', 'modalCrearUsuarioTitulo');
+  setText('nuevoUsuarioGenerarPassword', 'btnGenerarOtra');
+
+  // Modal: resetear acceso
+  setText('modalResetearTitulo', 'modalResetearTitulo');
+  setText('resetearAccesoBtn', 'btnConfirmarAdmin');
+  setText('resetearAccesoGenerarPassword', 'btnGenerarOtra');
+
+  // Modal: mueble
+  setText('muebleActivoLabel', 'muebleActivoLabel');
+  setText('guardarMuebleBtn', 'btnGuardarAdmin');
+  setPh('muebleNombre', 'muebleNombrePh');
+  setPh('muebleDescripcion', 'muebleDescripcionPh');
+  setPh('muebleFotos', 'muebleFotosPh');
+  setPh('muebleOrden', 'muebleOrdenPh');
+
+  // Modal: categorías
+  setText('modalCategoriasTitulo', 'modalCategoriasTitulo');
+  setText('modalCategoriasHint', 'modalCategoriasHint');
+  setText('categoriaAgregarBtn', 'btnAgregarCorto');
+  setPh('categoriaNuevaNombre', 'categoriaNuevaPh');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   mostrarSegunSesion();
   poblarSelectsEstadoUS();
+  aplicarIdiomaAdminEstatico();
 
   document.getElementById('loginBtn').addEventListener('click', iniciarSesion);
   document.getElementById('loginPassword').addEventListener('keydown', (e) => {
