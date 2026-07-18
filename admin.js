@@ -76,17 +76,25 @@ function mostrarPanel() {
 
   const esAdmin = esAdminPanel();
   document.getElementById('tabPedidos').classList.toggle('hidden', !esAdmin);
+  document.getElementById('tabEstantes').classList.toggle('hidden', !esAdmin);
+  document.getElementById('abrirCategoriasBtn').classList.toggle('hidden', !esAdmin);
   if (!esAdmin) {
-    // MSL/ZSL no tienen pestaña de Pedidos — entran directo a Usuarios.
+    // MSL/ZSL no tienen pestaña de Pedidos ni Estantes — entran directo
+    // a Usuarios.
     cambiarPanelAdmin('usuarios');
   }
 
   if (esAdmin) {
     cargarPedidos();
     suscribirseATiempoReal();
+    cargarMueblesAdmin();
+    cargarSolicitudesMuebleAdmin();
   }
   cargarUsuarios();
-  cargarProductosAdmin();
+  // Las categorías deben estar cargadas ANTES de pintar las tarjetas de
+  // producto (el selector de categoría las necesita), por eso se
+  // encadenan en vez de llamarlas por separado.
+  cargarCategoriasAdmin().then(cargarProductosAdmin);
   cargarReportes();
   suscribirseAUsuarios();
   initProfileMenu({ linkCatalogo: true, onLogout: cerrarSesion });
@@ -921,6 +929,7 @@ function cambiarPanelAdmin(panel) {
   document.getElementById('panelUsuarios').classList.toggle('hidden', panel !== 'usuarios');
   document.getElementById('panelProductos').classList.toggle('hidden', panel !== 'productos');
   document.getElementById('panelReportes').classList.toggle('hidden', panel !== 'reportes');
+  document.getElementById('panelEstantes').classList.toggle('hidden', panel !== 'estantes');
 }
 
 // ============================================================
@@ -943,7 +952,7 @@ async function cargarProductosAdmin() {
   }
   const { data, error } = await productsSupabaseClient
     .from('products')
-    .select('upc, producto, precio, unidades_caja, unidades_pallet, marca, activo, foto, cadenas_permitidas, es_nuevo')
+    .select('upc, producto, precio, unidades_caja, unidades_pallet, marca, activo, foto, cadenas_permitidas, es_nuevo, categoria')
     .order('producto');
   if (error) {
     console.error('Error cargando productos:', error);
@@ -951,6 +960,172 @@ async function cargarProductosAdmin() {
   }
   productosAdmin = data || [];
   renderProductosAdmin();
+}
+
+// ============================================================
+// CATEGORÍAS — antes era un mapeo fijo en el código (BARCEL->Barcel,
+// etc). Ahora vive en la tabla `categorias` (bimbo-inventory-pro,
+// misma tabla que products) y se administra desde aquí. "Otros
+// productos Bimbo" (fallback) y "Estantes" (muebles) son fijas, no
+// viven en esta tabla ni se pueden borrar/renombrar.
+// ============================================================
+let categoriasAdmin = [];
+
+async function cargarCategoriasAdmin() {
+  if (!productsSupabaseClient) return;
+  const { data, error } = await productsSupabaseClient.from('categorias').select('*').order('orden');
+  if (error) {
+    console.error('Error cargando categorías:', error);
+    return;
+  }
+  categoriasAdmin = data || [];
+}
+
+async function llamarAdminManageCategorias(payload) {
+  const {
+    data: { session },
+  } = await supabaseClient.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return { ok: false, mensaje: 'Sesión expirada, vuelve a iniciar sesión.' };
+  try {
+    const { data, error } = await productsSupabaseClient.functions.invoke('admin-manage-categorias', {
+      body: payload,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (error) {
+      let mensaje = error.message || 'Error';
+      try {
+        const ctx = await error.context?.json?.();
+        if (ctx?.error) mensaje = ctx.error;
+      } catch {
+        // sin detalle adicional, se queda con el mensaje genérico
+      }
+      return { ok: false, mensaje };
+    }
+    if (data?.error) return { ok: false, mensaje: data.error };
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, mensaje: String(err) };
+  }
+}
+
+function renderCategoriasModal() {
+  const wrap = document.getElementById('categoriasListWrap');
+  if (!wrap) return;
+  if (categoriasAdmin.length === 0) {
+    wrap.innerHTML = '<p class="hint-text">No hay categorías todavía.</p>';
+    return;
+  }
+  wrap.innerHTML = categoriasAdmin
+    .map(
+      (c) => `
+      <div class="categoria-row" data-categoria-row="${c.id}">
+        <input class="form-field" data-categoria-nombre="${c.id}" value="${(c.nombre || '').replace(/"/g, '&quot;')}" />
+        <input class="form-field categoria-orden-input" type="number" step="1" data-categoria-orden="${c.id}" value="${c.orden}" />
+        <label class="toggle-activo categoria-activa-toggle">
+          <input type="checkbox" data-categoria-activa="${c.id}" ${c.activa ? 'checked' : ''} />
+          <span class="switch"></span>
+        </label>
+        <button type="button" class="btn-secondary" data-categoria-guardar="${c.id}">Guardar</button>
+        <button type="button" class="btn-danger" data-categoria-eliminar="${c.id}">Eliminar</button>
+      </div>`
+    )
+    .join('');
+
+  wrap.querySelectorAll('[data-categoria-guardar]').forEach((btn) => {
+    btn.addEventListener('click', () => guardarCategoriaClick(btn.dataset.categoriaGuardar));
+  });
+  wrap.querySelectorAll('[data-categoria-eliminar]').forEach((btn) => {
+    btn.addEventListener('click', () => eliminarCategoriaClick(btn.dataset.categoriaEliminar));
+  });
+}
+
+function abrirModalCategorias() {
+  renderCategoriasModal();
+  document.getElementById('categoriasMsg').textContent = '';
+  abrirModal('categoriasModal');
+}
+
+async function refrescarCategoriasYProductos() {
+  await cargarCategoriasAdmin();
+  renderCategoriasModal();
+  await cargarProductosAdmin();
+}
+
+async function agregarCategoriaClick() {
+  const input = document.getElementById('categoriaNuevaNombre');
+  const msgEl = document.getElementById('categoriasMsg');
+  const nombre = input.value.trim();
+  if (!nombre) return;
+  const btn = document.getElementById('categoriaAgregarBtn');
+  btn.disabled = true;
+  const resultado = await llamarAdminManageCategorias({ accion: 'crear', nombre });
+  btn.disabled = false;
+  if (!resultado.ok) {
+    msgEl.textContent = '✕ ' + resultado.mensaje;
+    msgEl.style.color = '#c0392b';
+    return;
+  }
+  input.value = '';
+  msgEl.textContent = '✓ Categoría agregada';
+  msgEl.style.color = '#2e7d32';
+  await refrescarCategoriasYProductos();
+  setTimeout(() => {
+    if (msgEl) msgEl.textContent = '';
+  }, 2000);
+}
+
+async function guardarCategoriaClick(id) {
+  const nombreInput = document.querySelector(`[data-categoria-nombre="${id}"]`);
+  const ordenInput = document.querySelector(`[data-categoria-orden="${id}"]`);
+  const activaInput = document.querySelector(`[data-categoria-activa="${id}"]`);
+  const msgEl = document.getElementById('categoriasMsg');
+  const actual = categoriasAdmin.find((c) => c.id === id);
+  if (!actual) return;
+
+  const payload = { accion: 'editar', id };
+  if (nombreInput && nombreInput.value.trim() !== actual.nombre) payload.nombre = nombreInput.value.trim();
+  if (ordenInput && Number(ordenInput.value) !== actual.orden) payload.orden = Number(ordenInput.value);
+  if (activaInput && activaInput.checked !== actual.activa) payload.activa = activaInput.checked;
+
+  if (Object.keys(payload).length <= 2) {
+    msgEl.textContent = 'No hay cambios que guardar.';
+    return;
+  }
+
+  const resultado = await llamarAdminManageCategorias(payload);
+  if (!resultado.ok) {
+    msgEl.textContent = '✕ ' + resultado.mensaje;
+    msgEl.style.color = '#c0392b';
+    return;
+  }
+  const reasignados = resultado.data?.productos_reasignados;
+  msgEl.textContent = '✓ Guardado' + (reasignados ? ` (${reasignados} productos reasignados)` : '');
+  msgEl.style.color = '#2e7d32';
+  await refrescarCategoriasYProductos();
+  setTimeout(() => {
+    if (msgEl) msgEl.textContent = '';
+  }, 3000);
+}
+
+async function eliminarCategoriaClick(id) {
+  const actual = categoriasAdmin.find((c) => c.id === id);
+  if (!actual) return;
+  if (!confirm(`¿Eliminar la categoría "${actual.nombre}"? Los productos que la tengan pasarán a "Otros productos Bimbo".`)) return;
+  const msgEl = document.getElementById('categoriasMsg');
+  const resultado = await llamarAdminManageCategorias({ accion: 'eliminar', id });
+  if (!resultado.ok) {
+    msgEl.textContent = '✕ ' + resultado.mensaje;
+    msgEl.style.color = '#c0392b';
+    return;
+  }
+  const reasignados = resultado.data?.productos_reasignados;
+  msgEl.textContent = '✓ Categoría eliminada' + (reasignados ? ` (${reasignados} productos reasignados)` : '');
+  msgEl.style.color = '#2e7d32';
+  await refrescarCategoriasYProductos();
+  setTimeout(() => {
+    if (msgEl) msgEl.textContent = '';
+  }, 3000);
 }
 
 function renderProductosAdmin() {
@@ -1003,6 +1178,12 @@ function tarjetaProductoAdmin(p) {
   // admin real los edita. Un MSL/ZSL solo puede tocar las cadenas
   // autorizadas por producto.
   const esAdmin = esAdminPanel();
+  const categoriaActualProducto = p.categoria || 'Otros productos Bimbo';
+  const opcionesCategoriaProducto = categoriasAdmin
+    .map((c) => c.nombre)
+    .concat(categoriasAdmin.some((c) => c.nombre === 'Otros productos Bimbo') ? [] : ['Otros productos Bimbo'])
+    .map((nombre) => `<option value="${nombre}" ${nombre === categoriaActualProducto ? 'selected' : ''}>${nombre}</option>`)
+    .join('');
   const camposAdminHtml = esAdmin
     ? `
           <label>Precio<br />
@@ -1013,6 +1194,9 @@ function tarjetaProductoAdmin(p) {
           </label>
           <label>Cajas/tarima<br />
             <input type="number" step="1" min="0" class="form-field" data-campo-pallet="${p.upc}" value="${p.unidades_pallet ?? ''}" />
+          </label>
+          <label>Categoría<br />
+            <select class="form-field" data-campo-categoria="${p.upc}">${opcionesCategoriaProducto}</select>
           </label>
           <label class="toggle-activo">
             <input type="checkbox" data-campo-activo="${p.upc}" ${inactivo ? '' : 'checked'} />
@@ -1053,16 +1237,22 @@ async function guardarProductoAdminClick(upc) {
   const inputPallet = document.querySelector(`[data-campo-pallet="${upc}"]`);
   const inputActivo = document.querySelector(`[data-campo-activo="${upc}"]`);
   const inputNuevo = document.querySelector(`[data-campo-nuevo="${upc}"]`);
+  const inputCategoria = document.querySelector(`[data-campo-categoria="${upc}"]`);
   const inputsCadena = document.querySelectorAll(`[data-campo-cadena="${upc}"]`);
   const msgEl = document.querySelector(`[data-msg-producto="${upc}"]`);
 
   const p = productosAdmin.find((x) => x.upc === upc);
   const cambios = {};
-  // inputPrecio/Caja/Pallet/Activo/Nuevo no existen en el DOM para un
-  // MSL/ZSL (esa tarjeta no los renderiza) — de ahí los checks null-safe.
+  // inputPrecio/Caja/Pallet/Activo/Nuevo/Categoria no existen en el DOM
+  // para un MSL/ZSL (esa tarjeta no los renderiza) — de ahí los checks
+  // null-safe.
   if (inputPrecio && inputPrecio.value !== '') cambios.precio = Number(inputPrecio.value);
   if (inputCaja && inputCaja.value !== '') cambios.unidades_caja = Number(inputCaja.value);
   if (inputPallet && inputPallet.value !== '') cambios.unidades_pallet = Number(inputPallet.value);
+  if (inputCategoria) {
+    const categoriaActual = p ? p.categoria || 'Otros productos Bimbo' : 'Otros productos Bimbo';
+    if (inputCategoria.value !== categoriaActual) cambios.categoria = inputCategoria.value;
+  }
   if (inputActivo) {
     const activoActual = p ? p.activo !== false : true;
     if (inputActivo.checked !== activoActual) cambios.activo = inputActivo.checked;
@@ -1147,6 +1337,178 @@ async function guardarProductoAdmin(upc, cambios) {
   } catch (err) {
     return { ok: false, mensaje: String(err) };
   }
+}
+
+// ============================================================
+// ESTANTES (muebles) — sección informativa del catálogo, no vendible.
+// A diferencia de products/categorias, `muebles` vive en ESTE mismo
+// proyecto (catalogo-bimbo, junto con auth/profiles), así que el CRUD
+// es directo contra Supabase con RLS (is_admin()) — no necesita Edge
+// Function como products (que vive en el proyecto de Inventory Pro).
+// ============================================================
+let mueblesAdmin = [];
+let solicitudesMuebleAdmin = [];
+let muebleEditandoId = null;
+
+async function cargarMueblesAdmin() {
+  const { data, error } = await supabaseClient.from('muebles').select('*').order('orden');
+  if (error) {
+    console.error('Error cargando muebles:', error);
+    return;
+  }
+  mueblesAdmin = data || [];
+  renderMueblesAdmin();
+}
+
+function renderMueblesAdmin() {
+  const wrap = document.getElementById('mueblesAdminWrap');
+  if (!wrap) return;
+  if (mueblesAdmin.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">No hay muebles todavía.</p>';
+    return;
+  }
+  wrap.innerHTML = mueblesAdmin
+    .map(
+      (m) => `
+      <div class="order-card prod-admin-card ${m.activo ? '' : 'is-inactivo'}">
+        <div class="prod-admin-photo">${
+          (m.fotos && m.fotos[0]) ? `<img src="${m.fotos[0]}" alt="">` : '<span class="icon">🪑</span>'
+        }</div>
+        <div class="prod-admin-body">
+          <div class="order-cliente">${m.nombre || '(sin nombre)'}</div>
+          <div class="order-meta">${(m.fotos || []).length} foto(s) · orden ${m.orden} · ${m.activo ? 'Activo' : 'Pausado'}</div>
+          <div class="prod-admin-fields">
+            <button data-mueble-editar="${m.id}">Editar</button>
+            <button class="btn-danger" data-mueble-eliminar="${m.id}" style="width:auto;">Eliminar</button>
+          </div>
+        </div>
+      </div>`
+    )
+    .join('');
+
+  wrap.querySelectorAll('[data-mueble-editar]').forEach((btn) => {
+    btn.addEventListener('click', () => abrirModalMueble(btn.dataset.muebleEditar));
+  });
+  wrap.querySelectorAll('[data-mueble-eliminar]').forEach((btn) => {
+    btn.addEventListener('click', () => eliminarMuebleClick(btn.dataset.muebleEliminar));
+  });
+}
+
+function abrirModalMueble(id) {
+  muebleEditandoId = id || null;
+  const mueble = id ? mueblesAdmin.find((m) => m.id === id) : null;
+
+  document.getElementById('muebleFormTitulo').textContent = mueble ? 'Editar mueble' : 'Agregar mueble';
+  document.getElementById('muebleNombre').value = mueble?.nombre || '';
+  document.getElementById('muebleDescripcion').value = mueble?.descripcion || '';
+  document.getElementById('muebleFotos').value = (mueble?.fotos || []).join('\n');
+  document.getElementById('muebleOrden').value = mueble ? mueble.orden : mueblesAdmin.length * 10;
+  document.getElementById('muebleActivo').checked = mueble ? !!mueble.activo : true;
+  document.getElementById('muebleFormMsg').textContent = '';
+
+  abrirModal('muebleFormModal');
+}
+
+async function guardarMuebleClick() {
+  const btn = document.getElementById('guardarMuebleBtn');
+  const msgEl = document.getElementById('muebleFormMsg');
+  const nombre = document.getElementById('muebleNombre').value.trim();
+  if (!nombre) {
+    msgEl.textContent = 'Falta el nombre.';
+    return;
+  }
+  const fotos = document
+    .getElementById('muebleFotos')
+    .value.split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const orden = Number(document.getElementById('muebleOrden').value) || 0;
+  const activo = document.getElementById('muebleActivo').checked;
+  const descripcion = document.getElementById('muebleDescripcion').value.trim() || null;
+
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  const payload = { nombre, descripcion, fotos, orden, activo };
+  const { error } = muebleEditandoId
+    ? await supabaseClient.from('muebles').update(payload).eq('id', muebleEditandoId)
+    : await supabaseClient.from('muebles').insert(payload);
+
+  btn.disabled = false;
+  btn.textContent = 'Guardar';
+
+  if (error) {
+    msgEl.textContent = '✕ ' + error.message;
+    msgEl.style.color = '#c0392b';
+    return;
+  }
+
+  document.getElementById('muebleFormModal').classList.add('hidden');
+  await cargarMueblesAdmin();
+}
+
+async function eliminarMuebleClick(id) {
+  const mueble = mueblesAdmin.find((m) => m.id === id);
+  if (!mueble) return;
+  if (!confirm(`¿Eliminar el mueble "${mueble.nombre}"?`)) return;
+  const { error } = await supabaseClient.from('muebles').delete().eq('id', id);
+  if (error) {
+    alert('No se pudo eliminar: ' + error.message);
+    return;
+  }
+  await cargarMueblesAdmin();
+}
+
+async function cargarSolicitudesMuebleAdmin() {
+  const { data, error } = await supabaseClient
+    .from('solicitudes_mueble')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('Error cargando solicitudes de muebles:', error);
+    return;
+  }
+  solicitudesMuebleAdmin = data || [];
+  renderSolicitudesMuebleAdmin();
+}
+
+function renderSolicitudesMuebleAdmin() {
+  const wrap = document.getElementById('solicitudesMuebleWrap');
+  if (!wrap) return;
+  if (solicitudesMuebleAdmin.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">No hay solicitudes todavía.</p>';
+    return;
+  }
+  wrap.innerHTML = solicitudesMuebleAdmin
+    .map((s) => {
+      const fecha = s.created_at ? new Date(s.created_at).toLocaleDateString() : '';
+      return `
+      <div class="order-row-compact">
+        <div style="flex:1;">
+          <strong>${s.mueble_nombre}</strong> — ${s.cliente_nombre || ''} ${s.tienda_nombre ? '(' + s.tienda_nombre + ')' : ''}<br>
+          <span class="hint-text" style="margin:0;">${s.cliente_telefono || ''} ${s.cliente_email || ''} · ${fecha}</span>
+        </div>
+        ${
+          s.estado === 'atendido'
+            ? '<span class="order-badge aprobado">Atendido</span>'
+            : `<button data-solicitud-atender="${s.id}">Marcar atendido</button>`
+        }
+      </div>`;
+    })
+    .join('');
+
+  wrap.querySelectorAll('[data-solicitud-atender]').forEach((btn) => {
+    btn.addEventListener('click', () => marcarSolicitudAtendida(btn.dataset.solicitudAtender));
+  });
+}
+
+async function marcarSolicitudAtendida(id) {
+  const { error } = await supabaseClient.from('solicitudes_mueble').update({ estado: 'atendido' }).eq('id', id);
+  if (error) {
+    alert('No se pudo actualizar: ' + error.message);
+    return;
+  }
+  await cargarSolicitudesMuebleAdmin();
 }
 
 // ============================================================
@@ -1377,6 +1739,15 @@ document.addEventListener('DOMContentLoaded', () => {
     filtroActivoProductos = e.target.value;
     renderProductosAdmin();
   });
+
+  document.getElementById('abrirCategoriasBtn').addEventListener('click', abrirModalCategorias);
+  document.getElementById('categoriaAgregarBtn').addEventListener('click', agregarCategoriaClick);
+  document.getElementById('categoriaNuevaNombre').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') agregarCategoriaClick();
+  });
+
+  document.getElementById('abrirMuebleNuevoBtn').addEventListener('click', () => abrirModalMueble(null));
+  document.getElementById('guardarMuebleBtn').addEventListener('click', guardarMuebleClick);
 
   document.querySelectorAll('[data-close]').forEach((btn) => {
     btn.addEventListener('click', () => cerrarModal(btn.dataset.close));

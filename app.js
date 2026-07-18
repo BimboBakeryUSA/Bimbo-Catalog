@@ -59,7 +59,7 @@ async function mostrarApp() {
   }
 
   document.getElementById('appShell').classList.remove('hidden');
-  await cargarProductos();
+  await Promise.all([cargarProductos(), cargarCategoriasCatalogo(), cargarMuebles()]);
   renderChips();
   renderCatalogo();
   actualizarBadge();
@@ -228,6 +228,39 @@ function cambiarTabAuth(tab) {
 let PRODUCTOS = [];
 const PRODUCTOS_CACHE_KEY = 'catalogo-bimbo-productos-cache';
 
+// Lista de categorías (tabla `categorias`, bimbo-inventory-pro) — solo
+// se usa para el ORDEN de los chips; el texto/valor real de cada
+// producto ya viene en producto.categoria.
+let CATEGORIAS_DB = [];
+
+async function cargarCategoriasCatalogo() {
+  if (!productsSupabaseClient) return;
+  try {
+    const { data, error } = await productsSupabaseClient.from('categorias').select('*').eq('activa', true).order('orden');
+    if (error) throw error;
+    CATEGORIAS_DB = data || [];
+  } catch (err) {
+    console.error('Error cargando categorías:', err);
+    CATEGORIAS_DB = [];
+  }
+}
+
+// Muebles ("Estantes" de cara al cliente) — sección informativa, no
+// vendible. Vive en catalogo-bimbo (mismo proyecto que auth), no en
+// bimbo-inventory-pro.
+let MUEBLES = [];
+
+async function cargarMuebles() {
+  try {
+    const { data, error } = await supabaseClient.from('muebles').select('*').eq('activo', true).order('orden');
+    if (error) throw error;
+    MUEBLES = data || [];
+  } catch (err) {
+    console.error('Error cargando muebles:', err);
+    MUEBLES = [];
+  }
+}
+
 // Paleta de colores solo para el fondo de la tarjeta cuando no hay foto
 // real todavía. Es puramente cosmético — no se guarda en la base.
 const PALETA_COLORES = ['#FBEFD9', '#F0E4CB', '#FCE9DE', '#FBF0D3', '#FBE4E9', '#F4E6CE', '#F8EFDA', '#FBDFE2'];
@@ -238,24 +271,24 @@ function colorParaProducto(upc) {
   return PALETA_COLORES[hash % PALETA_COLORES.length];
 }
 
-// Categoría = marca del producto (Barcel, Bimbo, Marinela, Entenmann's).
-// Los pocos productos sin marca asignada caen en el genérico de abajo.
-const MARCA_DISPLAY = {
-  BARCEL: 'Barcel',
-  BIMBO: 'Bimbo',
-  MARINELA: 'Marinela',
-  ENTENMANNS: "Entenmann's",
-};
+// Categoría — ahora viene directo de products.categoria (editable desde
+// el panel, tabla `categorias`). Ya no es un mapeo fijo por marca en el
+// código; ver migración "categorias_y_products_categoria". Los pocos
+// productos sin categoria asignada caen en el genérico de abajo.
 // Clave interna estable (no se traduce) — el texto que se muestra sale
 // de t('categoriaOtros') al momento de renderizar.
 const CATEGORIA_DEFAULT = 'Otros productos Bimbo';
 
-// Ícono representativo por marca (mientras no hay fotos reales).
+// Ícono representativo por categoría (mientras no hay fotos reales).
+// Cualquier categoría nueva que no esté aquí usa el fallback 🍞 donde
+// se consulta este objeto — no hace falta tocar esto al crear una
+// categoría desde el panel.
 const ICONOS_CATEGORIA = {
   Barcel: '🌶️',
   Bimbo: '🍞',
   Marinela: '🧁',
   "Entenmann's": '🍩',
+  Shipper: '📦',
   [CATEGORIA_DEFAULT]: '🍞',
 };
 
@@ -334,7 +367,7 @@ function mapProductoDB(row) {
   return {
     slug: row.upc,
     nombre: row.producto,
-    categoria: MARCA_DISPLAY[row.marca] || CATEGORIA_DEFAULT,
+    categoria: row.categoria || CATEGORIA_DEFAULT,
     precioUnidad,
     precio,
     ventaPorCaja,
@@ -407,7 +440,7 @@ async function cargarProductos() {
     await cargarPrefijosMarca();
     const { data, error } = await productsSupabaseClient
       .from('products')
-      .select('upc, sku, producto, precio, unidades_caja, unidades_pallet, foto, activo, marca, ventas_totales, cadenas_permitidas, es_nuevo')
+      .select('upc, sku, producto, precio, unidades_caja, unidades_pallet, foto, activo, marca, ventas_totales, cadenas_permitidas, es_nuevo, categoria')
       .eq('activo', true)
       .not('precio', 'is', null)
       .gt('precio', 0)
@@ -510,8 +543,17 @@ function actualizarBadge() {
 // ============================================================
 // RENDER: CHIPS DE CATEGORÍA
 // ============================================================
+// Devuelve las categorías que tienen al menos un producto, en el orden
+// definido en la tabla `categorias` (CATEGORIAS_DB). "Otros productos
+// Bimbo" no vive en esa tabla (es el fallback fijo) — si hay productos
+// ahí, se agrega siempre al final.
 function getCategorias() {
-  return [...new Set(PRODUCTOS.map((p) => p.categoria))];
+  const nombresConProductos = new Set(PRODUCTOS.map((p) => p.categoria));
+  const ordenadas = CATEGORIAS_DB.map((c) => c.nombre).filter((nombre) => nombresConProductos.has(nombre));
+  if (nombresConProductos.has(CATEGORIA_DEFAULT) && !ordenadas.includes(CATEGORIA_DEFAULT)) {
+    ordenadas.push(CATEGORIA_DEFAULT);
+  }
+  return ordenadas;
 }
 
 // Dentro de cada sección, los productos que SÍ puede pedir el cliente van
@@ -530,6 +572,7 @@ function labelChip(cat) {
   if (cat === 'Todas') return t('chipTodas');
   if (cat === 'Novedades') return t('seccionNuevosTitulo');
   if (cat === 'Populares') return t('seccionPopularesTitulo');
+  if (cat === 'Estantes') return t('chipEstantes');
   return displayCategoria(cat);
 }
 
@@ -537,11 +580,14 @@ function renderChips() {
   const wrap = document.getElementById('chipsWrap');
   const tieneNuevos = PRODUCTOS.some((p) => p.esNuevo);
   const tienePopulares = PRODUCTOS.some((p) => p.esHot);
+  const tieneEstantes = MUEBLES.length > 0;
   const categorias = [
     'Todas',
     ...(tieneNuevos ? ['Novedades'] : []),
     ...(tienePopulares ? ['Populares'] : []),
     ...getCategorias(),
+    // "Estantes" (muebles) siempre al final, como pidió Doug.
+    ...(tieneEstantes ? ['Estantes'] : []),
   ];
   wrap.innerHTML = categorias
     .map((cat) => `<button class="chip${cat === categoriaActiva ? ' active' : ''}" data-cat="${cat}">${labelChip(cat)}</button>`)
@@ -625,6 +671,128 @@ function crearSeccionGrid(tituloTexto, productos) {
 }
 
 // ============================================================
+// RENDER: ESTANTES (muebles) — sección informativa, sin precio ni
+// botón de Agregar. La tarjeta abre el detalle con el carrusel de
+// fotos y el botón "Solicitar información".
+// ============================================================
+function crearTarjetaMueble(mueble) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.onclick = () => abrirDetalleMueble(mueble.id);
+
+  const image = document.createElement('div');
+  image.className = 'card-image';
+  const foto = (mueble.fotos || [])[0] || '';
+  if (foto) {
+    image.style.background = '#fff';
+    image.innerHTML = `<img src="${foto}" alt="${mueble.nombre}" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;">`;
+  } else {
+    image.style.background = '#F7F7F8';
+    image.innerHTML = `<span class="icon">🪑</span>`;
+  }
+
+  const body = document.createElement('div');
+  body.className = 'card-body';
+  body.innerHTML = `
+    <span class="card-category">${t('chipEstantes')}</span>
+    <span class="card-name">${mueble.nombre}</span>
+  `;
+
+  card.appendChild(image);
+  card.appendChild(body);
+  return card;
+}
+
+function crearSeccionMuebles(muebles) {
+  const section = document.createElement('section');
+  const titulo = document.createElement('h2');
+  titulo.className = 'category-title';
+  titulo.textContent = t('chipEstantes');
+  section.appendChild(titulo);
+
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+  muebles.forEach((m) => grid.appendChild(crearTarjetaMueble(m)));
+  section.appendChild(grid);
+
+  return section;
+}
+
+function crearMuebleCarouselHtml(fotos) {
+  if (!fotos || fotos.length === 0) {
+    return `<div class="detail-image" style="background:#F7F7F8;"><span class="icon">🪑</span></div>`;
+  }
+  return `
+    <div class="mueble-carousel">
+      ${fotos
+        .map(
+          (url) =>
+            `<img src="${url}" alt="" class="mueble-carousel-img" onclick="abrirImagenGrande('${url.replace(/'/g, "\\'")}', '')">`
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+function abrirDetalleMueble(id) {
+  const mueble = MUEBLES.find((m) => m.id === id);
+  if (!mueble) return;
+
+  const body = document.getElementById('muebleModalBody');
+  body.innerHTML = `
+    ${crearMuebleCarouselHtml(mueble.fotos)}
+    <div class="detail-header-row">
+      <div>
+        <span class="detail-category">${t('chipEstantes')}</span>
+        <h2 class="detail-name">${mueble.nombre}</h2>
+      </div>
+    </div>
+    ${mueble.descripcion ? `<p class="detail-desc">${mueble.descripcion}</p>` : ''}
+    <button class="btn-primary" id="muebleSolicitarBtn">${t('muebleSolicitarBtn')}</button>
+    <p id="muebleSolicitarMsg" class="hint-text hidden" style="color:#0F8A3D;"></p>
+  `;
+
+  const btn = document.getElementById('muebleSolicitarBtn');
+  btn.onclick = () => solicitarInfoMueble(mueble.id, mueble.nombre, btn);
+
+  abrirModal('muebleModal');
+}
+
+async function solicitarInfoMueble(muebleId, muebleNombre, btn) {
+  const msgEl = document.getElementById('muebleSolicitarMsg');
+  btn.disabled = true;
+  btn.textContent = t('muebleSolicitarBtnLoading');
+
+  const { error } = await supabaseClient.from('solicitudes_mueble').insert({
+    mueble_id: muebleId,
+    mueble_nombre: muebleNombre,
+    user_id: usuarioActual?.id || null,
+    cliente_nombre: perfilActual?.nombre || null,
+    cliente_telefono: perfilActual?.telefono || null,
+    cliente_email: usuarioActual?.email || null,
+    tienda_nombre: perfilActual?.tienda_nombre || null,
+  });
+
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = t('muebleSolicitarBtn');
+    if (msgEl) {
+      msgEl.textContent = t('muebleSolicitarError');
+      msgEl.classList.remove('hidden');
+      msgEl.style.color = '#c0392b';
+    }
+    return;
+  }
+
+  btn.textContent = t('muebleSolicitarOk');
+  if (msgEl) {
+    msgEl.textContent = t('muebleSolicitarConfirmacion');
+    msgEl.classList.remove('hidden');
+    msgEl.style.color = '#0F8A3D';
+  }
+}
+
+// ============================================================
 // RENDER: CATÁLOGO
 // ============================================================
 function renderCatalogo() {
@@ -632,6 +800,18 @@ function renderCatalogo() {
   wrap.innerHTML = '';
   const texto = textoBusqueda.trim().toLowerCase();
   let algoRenderizado = false;
+
+  // "Estantes" (muebles) es una sección aparte, no productos — se
+  // resuelve sola y no sigue el flujo de abajo.
+  if (categoriaActiva === 'Estantes') {
+    const muebles = MUEBLES.filter((m) => !texto || (m.nombre || '').toLowerCase().includes(texto));
+    if (muebles.length > 0) {
+      wrap.appendChild(crearSeccionMuebles(muebles));
+    } else {
+      wrap.innerHTML = `<p class="empty-state">${t('emptyState')}</p>`;
+    }
+    return;
+  }
 
   // Carrusel ambiental de Novedades — solo en la vista general ("Todas",
   // sin buscar). Se muestra ADEMÁS de su propio chip, no en vez de él.

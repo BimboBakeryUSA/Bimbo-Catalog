@@ -371,6 +371,26 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .modal-divider { border: none; border-top: 1px solid var(--line); margin: 20px 0 16px; }
 .modal-section-title { font-size: 0.95rem; font-weight: 700; margin: 0 0 10px; color: var(--ink); }
 
+/* Carrusel de fotos en el detalle de un mueble (Estantes) */
+.mueble-carousel {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+}
+.mueble-carousel-img {
+  flex: 0 0 auto;
+  height: 220px;
+  width: auto;
+  max-width: 85%;
+  border-radius: var(--radius-md);
+  object-fit: contain;
+  background: var(--surface);
+  cursor: zoom-in;
+}
+
 .modal-close {
   position: absolute;
   top: 16px;
@@ -962,6 +982,30 @@ select.form-field {
 }
 .toggle-activo input:checked + .switch { background: #0F8A3D; }
 .toggle-activo input:checked + .switch::after { transform: translateX(16px); }
+
+.btn-danger {
+  border: 1px solid var(--bimbo-red);
+  background: #fff;
+  color: var(--bimbo-red);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-danger:hover { background: #FDECEC; }
+
+.categoria-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.categoria-row .form-field { margin-bottom: 0; width: auto; flex: 1; }
+.categoria-row .categoria-orden-input { flex: 0 0 64px; }
+.categoria-row .categoria-activa-toggle { flex: 0 0 auto; }
+.categoria-row .btn-secondary,
+.categoria-row .btn-danger { width: auto; flex: 0 0 auto; padding: 8px 12px; font-size: 0.8rem; }
 
 .prod-admin-cadenas {
   margin-top: 10px;

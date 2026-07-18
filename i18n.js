@@ -130,6 +130,12 @@ const I18N = {
     perfilPasswordErrorEmpty: 'Completa ambos campos.',
     perfilPasswordErrorMismatch: 'Las contraseñas no coinciden.',
     perfilPasswordErrorSave: 'No se pudo actualizar: ',
+    chipEstantes: 'Estantes',
+    muebleSolicitarBtn: 'Solicitar información',
+    muebleSolicitarBtnLoading: 'Enviando...',
+    muebleSolicitarOk: '✓ ¡Enviado!',
+    muebleSolicitarConfirmacion: 'Listo, tu representante Bimbo te contactará pronto.',
+    muebleSolicitarError: 'No se pudo enviar tu solicitud. Intenta de nuevo.',
   },
   en: {
     authTabLogin: 'Sign in',
@@ -232,6 +238,12 @@ const I18N = {
     perfilPasswordErrorEmpty: 'Fill in both fields.',
     perfilPasswordErrorMismatch: "Passwords don't match.",
     perfilPasswordErrorSave: "Couldn't update: ",
+    chipEstantes: 'Racks',
+    muebleSolicitarBtn: 'Request info',
+    muebleSolicitarBtnLoading: 'Sending...',
+    muebleSolicitarOk: '✓ Sent!',
+    muebleSolicitarConfirmacion: "Done — your Bimbo rep will reach out soon.",
+    muebleSolicitarError: "Couldn't send your request. Please try again.",
   },
 };
 
