@@ -926,13 +926,24 @@ async function resetearAccesoClick() {
 }
 
 function cambiarPanelAdmin(panel) {
-  document.querySelectorAll('.admin-tabs .auth-tab').forEach((btn) => btn.classList.toggle('active', btn.dataset.panel === panel));
+  document.querySelectorAll('.admin-nav .admin-nav-item').forEach((btn) => btn.classList.toggle('active', btn.dataset.panel === panel));
   document.getElementById('panelPedidos').classList.toggle('hidden', panel !== 'pedidos');
   document.getElementById('panelUsuarios').classList.toggle('hidden', panel !== 'usuarios');
   document.getElementById('panelProductos').classList.toggle('hidden', panel !== 'productos');
   document.getElementById('panelReportes').classList.toggle('hidden', panel !== 'reportes');
   document.getElementById('panelEstantes').classList.toggle('hidden', panel !== 'estantes');
   document.getElementById('panelActividad').classList.toggle('hidden', panel !== 'actividad');
+}
+
+// Menú lateral en móvil (cajón deslizable) — en desktop estas clases no
+// tienen efecto visual porque el CSS solo las usa dentro del media query.
+function abrirSidebarAdmin() {
+  document.getElementById('adminSidebar').classList.add('open');
+  document.getElementById('adminSidebarBackdrop').classList.add('open');
+}
+function cerrarSidebarAdmin() {
+  document.getElementById('adminSidebar').classList.remove('open');
+  document.getElementById('adminSidebarBackdrop').classList.remove('open');
 }
 
 // ============================================================
@@ -1755,9 +1766,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  document.querySelectorAll('.admin-tabs .auth-tab').forEach((btn) => {
-    btn.addEventListener('click', () => cambiarPanelAdmin(btn.dataset.panel));
+  document.querySelectorAll('.admin-nav .admin-nav-item').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      cambiarPanelAdmin(btn.dataset.panel);
+      cerrarSidebarAdmin();
+    });
   });
+
+  // Menú lateral: en móvil es un cajón (drawer) que se abre con "☰ Menú"
+  // y se cierra con el fondo oscuro o al elegir una sección.
+  document.getElementById('sidebarOpenBtn').addEventListener('click', abrirSidebarAdmin);
+  document.getElementById('adminSidebarBackdrop').addEventListener('click', cerrarSidebarAdmin);
 
   document.getElementById('usuariosFilter').querySelectorAll('.chip').forEach((btn) => {
     btn.addEventListener('click', () => {

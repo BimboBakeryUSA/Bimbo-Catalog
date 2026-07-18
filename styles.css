@@ -776,15 +776,107 @@ select.form-field {
 }
 .auth-tab.active { background: #fff; color: var(--ink); box-shadow: var(--shadow-sm); }
 
-.admin-tabs {
-  display: inline-flex;
-  gap: 4px;
-  background: var(--surface);
-  border-radius: 999px;
-  padding: 4px;
-  margin-bottom: 20px;
+/* ============================================================ */
+/* PANEL ADMIN — layout con menú lateral (antes eran tabs           */
+/* horizontales; con 6 secciones ya no cabían sin hacer scroll).    */
+/* Desktop: sidebar fijo a la izquierda. Móvil/pantalla angosta:    */
+/* el sidebar se vuelve un cajón (drawer) que se abre con "☰ Menú". */
+/* ============================================================ */
+.admin-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
 }
-.admin-tabs .auth-tab { flex: none; padding: 9px 16px; }
+
+.admin-sidebar {
+  flex: 0 0 200px;
+  position: sticky;
+  top: 78px;
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.admin-nav-item:hover { background: var(--surface); }
+.admin-nav-item.active { background: var(--bimbo-red); color: #fff; }
+.admin-nav-item.active .cart-badge { background: #fff; color: var(--bimbo-red); }
+
+.admin-main {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar-open-btn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+
+.admin-sidebar-backdrop { display: none; }
+
+@media (max-width: 860px) {
+  .admin-layout { padding: 20px 16px 60px; flex-direction: column; gap: 0; }
+  .sidebar-open-btn { display: inline-flex; }
+
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    width: 240px;
+    max-width: 80vw;
+    background: #fff;
+    z-index: 40;
+    padding: 24px 16px;
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.open { transform: translateX(0); }
+
+  .admin-sidebar-backdrop.open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(20,22,58,0.35);
+    z-index: 39;
+  }
+}
 
 .orders-toolbar {
   display: flex;
