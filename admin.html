@@ -45,11 +45,12 @@
       <div id="newOrderBanner" class="new-order-banner hidden">Nuevo pedido recibido</div>
 
       <div class="admin-tabs">
-        <button class="auth-tab active" data-panel="pedidos">Pedidos</button>
+        <button class="auth-tab active" data-panel="pedidos" id="tabPedidos">Pedidos</button>
         <button class="auth-tab" data-panel="usuarios">
           Usuarios <span id="pendientesBadge" class="cart-badge hidden" style="position:static; margin-left:4px;">0</span>
         </button>
         <button class="auth-tab" data-panel="productos">Productos</button>
+        <button class="auth-tab" data-panel="reportes" id="tabReportes">Reportes</button>
       </div>
 
       <div id="panelPedidos">
@@ -106,6 +107,14 @@
         </div>
         <p class="hint-text">Edita precio, piezas por caja, cajas por tarima, pausa el producto, márcalo como "Nuevo" (aparece en Novedades del catálogo) o agrega las cadenas donde está autorizado además de Independientes (por defecto solo lo ven clientes Independientes), y da clic en Guardar. Los cambios se reflejan de inmediato.</p>
         <div id="productosWrap"></div>
+      </div>
+
+      <div id="panelReportes" class="hidden">
+        <div class="orders-toolbar">
+          <h1 class="orders-title">Reportes</h1>
+        </div>
+        <p class="hint-text">Ventas de tu equipo, agrupadas por IBP. Cada MSL/ZSL solo ve a su propio equipo; el admin ve todo.</p>
+        <div id="reportesWrap"></div>
       </div>
     </main>
   </div>
@@ -200,6 +209,6 @@
   <script src="i18n.js?v=3"></script>
   <script src="config.js?v=13"></script>
   <script src="profile-menu.js?v=15"></script>
-  <script src="admin.js?v=22"></script>
+  <script src="admin.js?v=23"></script>
 </body>
 </html>

@@ -1,6 +1,16 @@
 // Panel de pedidos — requiere login real (Supabase Auth).
 // CONFIG y supabaseClient vienen de config.js
 
+// Quién está logueado en el panel — determina qué ve/puede hacer.
+// 'admin' ve todo; 'msl'/'zsl' ven un panel recortado (su propio
+// equipo, sin Pedidos, sin editar precios). 'ibp' y 'cliente' NO
+// entran al panel — solo usan el catálogo.
+let miPerfilAdmin = null;
+const ROLES_PANEL_PERMITIDOS = ['admin', 'msl', 'zsl'];
+function esAdminPanel() {
+  return miPerfilAdmin?.role === 'admin';
+}
+
 let pedidos = [];
 let filtroEstado = 'todos';
 let busquedaPedidos = '';
@@ -44,28 +54,40 @@ async function intentarMostrarPanel() {
   } = await supabaseClient.auth.getUser();
   const { data: perfil } = await supabaseClient
     .from('profiles')
-    .select('role')
+    .select('*')
     .eq('id', user.id)
     .maybeSingle();
 
-  if (perfil?.role !== 'admin') {
+  if (!perfil || !ROLES_PANEL_PERMITIDOS.includes(perfil.role)) {
     await supabaseClient.auth.signOut();
     const errorEl = document.getElementById('loginError');
-    errorEl.textContent = 'Esta cuenta no tiene permisos de admin.';
+    errorEl.textContent = 'Esta cuenta no tiene permisos para entrar al panel.';
     errorEl.classList.remove('hidden');
     mostrarLogin();
     return;
   }
+  miPerfilAdmin = perfil;
   mostrarPanel();
 }
 
 function mostrarPanel() {
   document.getElementById('loginView').classList.add('hidden');
   document.getElementById('ordersView').classList.remove('hidden');
-  cargarPedidos();
+
+  const esAdmin = esAdminPanel();
+  document.getElementById('tabPedidos').classList.toggle('hidden', !esAdmin);
+  if (!esAdmin) {
+    // MSL/ZSL no tienen pestaña de Pedidos — entran directo a Usuarios.
+    cambiarPanelAdmin('usuarios');
+  }
+
+  if (esAdmin) {
+    cargarPedidos();
+    suscribirseATiempoReal();
+  }
   cargarUsuarios();
   cargarProductosAdmin();
-  suscribirseATiempoReal();
+  cargarReportes();
   suscribirseAUsuarios();
   initProfileMenu({ linkCatalogo: true, onLogout: cerrarSesion });
 }
@@ -442,8 +464,13 @@ function tarjetaUsuario(u) {
     }
     if (u.estado_cuenta === 'aprobado') {
       acciones.push(`<button data-rechazar="${u.id}">Rechazar</button>`);
-      acciones.push(`<button data-hacer-admin="${u.id}">Hacer admin</button>`);
-      acciones.push(`<button data-resetear-acceso="${u.id}">Resetear acceso</button>`);
+      // Dar de admin y resetear acceso (contraseñas) se quedan solo para
+      // admin — un MSL/ZSL puede gestionar a su equipo, pero no tocar
+      // credenciales ni crear más admins.
+      if (esAdminPanel()) {
+        acciones.push(`<button data-hacer-admin="${u.id}">Hacer admin</button>`);
+        acciones.push(`<button data-resetear-acceso="${u.id}">Resetear acceso</button>`);
+      }
       acciones.push(`<button data-expandir-usuario="${u.id}">Minimizar</button>`);
     }
   }
@@ -583,7 +610,17 @@ function generarPasswordAutomatica(nombre) {
 let nuevoUsuarioPasswordManual = false;
 
 function abrirModalCrearUsuario() {
-  document.getElementById('nuevoUsuarioTipo').value = 'cliente';
+  // Un MSL/ZSL solo puede dar de alta clientes e IBP — crear otro MSL,
+  // ZSL o admin se queda exclusivo para el admin real.
+  const tipoSelect = document.getElementById('nuevoUsuarioTipo');
+  tipoSelect.innerHTML = esAdminPanel()
+    ? `<option value="cliente">Cliente (hace pedidos)</option>
+       <option value="ibp">IBP (solo cataloga, sin permisos)</option>
+       <option value="msl">MSL (gestiona sus IBP y clientes)</option>
+       <option value="zsl">ZSL (gestiona sus MSL)</option>`
+    : `<option value="cliente">Cliente (hace pedidos)</option>
+       <option value="ibp">IBP (solo cataloga, sin permisos)</option>`;
+  tipoSelect.value = 'cliente';
   document.getElementById('nuevoUsuarioNombre').value = '';
   document.getElementById('nuevoUsuarioTelefono').value = '';
   document.getElementById('nuevoUsuarioEmail').value = '';
@@ -883,6 +920,7 @@ function cambiarPanelAdmin(panel) {
   document.getElementById('panelPedidos').classList.toggle('hidden', panel !== 'pedidos');
   document.getElementById('panelUsuarios').classList.toggle('hidden', panel !== 'usuarios');
   document.getElementById('panelProductos').classList.toggle('hidden', panel !== 'productos');
+  document.getElementById('panelReportes').classList.toggle('hidden', panel !== 'reportes');
 }
 
 // ============================================================
@@ -961,13 +999,12 @@ function tarjetaProductoAdmin(p) {
     )
     .join('');
 
-  return `
-    <div class="order-card prod-admin-card ${inactivo ? 'is-inactivo' : ''}">
-      ${fotoHtml}
-      <div class="prod-admin-body">
-        <div class="order-cliente">${p.producto || '(sin nombre)'}</div>
-        <div class="order-meta">UPC: ${p.upc}${p.marca ? ' · ' + p.marca : ''}</div>
-        <div class="prod-admin-fields">
+  // Precio/unidades/activo/nuevo son sensibles al negocio — solo el
+  // admin real los edita. Un MSL/ZSL solo puede tocar las cadenas
+  // autorizadas por producto.
+  const esAdmin = esAdminPanel();
+  const camposAdminHtml = esAdmin
+    ? `
           <label>Precio<br />
             <input type="number" step="0.01" min="0" class="form-field" data-campo-precio="${p.upc}" value="${p.precio ?? ''}" />
           </label>
@@ -986,7 +1023,17 @@ function tarjetaProductoAdmin(p) {
             <input type="checkbox" data-campo-nuevo="${p.upc}" ${esNuevo ? 'checked' : ''} />
             <span class="switch"></span>
             <span data-label-nuevo="${p.upc}">${esNuevo ? 'Nuevo ✓' : 'Marcar como nuevo'}</span>
-          </label>
+          </label>`
+    : '';
+
+  return `
+    <div class="order-card prod-admin-card ${inactivo ? 'is-inactivo' : ''}">
+      ${fotoHtml}
+      <div class="prod-admin-body">
+        <div class="order-cliente">${p.producto || '(sin nombre)'}</div>
+        <div class="order-meta">UPC: ${p.upc}${p.marca ? ' · ' + p.marca : ''}${!esAdmin && p.precio != null ? ' · $' + Number(p.precio).toFixed(2) : ''}</div>
+        <div class="prod-admin-fields">
+          ${camposAdminHtml}
           <button data-guardar-producto="${p.upc}">Guardar</button>
         </div>
         <div class="prod-admin-cadenas">
@@ -1011,13 +1058,19 @@ async function guardarProductoAdminClick(upc) {
 
   const p = productosAdmin.find((x) => x.upc === upc);
   const cambios = {};
-  if (inputPrecio.value !== '') cambios.precio = Number(inputPrecio.value);
-  if (inputCaja.value !== '') cambios.unidades_caja = Number(inputCaja.value);
-  if (inputPallet.value !== '') cambios.unidades_pallet = Number(inputPallet.value);
-  const activoActual = p ? p.activo !== false : true;
-  if (inputActivo.checked !== activoActual) cambios.activo = inputActivo.checked;
-  const nuevoActual = p ? p.es_nuevo === true : false;
-  if (inputNuevo.checked !== nuevoActual) cambios.es_nuevo = inputNuevo.checked;
+  // inputPrecio/Caja/Pallet/Activo/Nuevo no existen en el DOM para un
+  // MSL/ZSL (esa tarjeta no los renderiza) — de ahí los checks null-safe.
+  if (inputPrecio && inputPrecio.value !== '') cambios.precio = Number(inputPrecio.value);
+  if (inputCaja && inputCaja.value !== '') cambios.unidades_caja = Number(inputCaja.value);
+  if (inputPallet && inputPallet.value !== '') cambios.unidades_pallet = Number(inputPallet.value);
+  if (inputActivo) {
+    const activoActual = p ? p.activo !== false : true;
+    if (inputActivo.checked !== activoActual) cambios.activo = inputActivo.checked;
+  }
+  if (inputNuevo) {
+    const nuevoActual = p ? p.es_nuevo === true : false;
+    if (inputNuevo.checked !== nuevoActual) cambios.es_nuevo = inputNuevo.checked;
+  }
 
   const cadenasSeleccionadas = Array.from(inputsCadena)
     .filter((cb) => cb.checked)
@@ -1052,12 +1105,16 @@ async function guardarProductoAdminClick(upc) {
   msgEl.textContent = '✓ Guardado';
   msgEl.style.color = '#2e7d32';
   if (p) Object.assign(p, cambios);
-  const card = btn.closest('.prod-admin-card');
-  if (card) card.classList.toggle('is-inactivo', inputActivo.checked === false);
-  const labelEl = document.querySelector(`[data-label-activo="${upc}"]`);
-  if (labelEl) labelEl.textContent = inputActivo.checked ? 'Activo' : 'Pausado';
-  const labelNuevoEl = document.querySelector(`[data-label-nuevo="${upc}"]`);
-  if (labelNuevoEl) labelNuevoEl.textContent = inputNuevo.checked ? 'Nuevo ✓' : 'Marcar como nuevo';
+  if (inputActivo) {
+    const card = btn.closest('.prod-admin-card');
+    if (card) card.classList.toggle('is-inactivo', inputActivo.checked === false);
+    const labelEl = document.querySelector(`[data-label-activo="${upc}"]`);
+    if (labelEl) labelEl.textContent = inputActivo.checked ? 'Activo' : 'Pausado';
+  }
+  if (inputNuevo) {
+    const labelNuevoEl = document.querySelector(`[data-label-nuevo="${upc}"]`);
+    if (labelNuevoEl) labelNuevoEl.textContent = inputNuevo.checked ? 'Nuevo ✓' : 'Marcar como nuevo';
+  }
   setTimeout(() => {
     if (msgEl) msgEl.textContent = '';
   }, 2500);
@@ -1090,6 +1147,112 @@ async function guardarProductoAdmin(upc, cambios) {
   } catch (err) {
     return { ok: false, mensaje: String(err) };
   }
+}
+
+// ============================================================
+// REPORTES — ventas agrupadas por IBP (y por MSL para ZSL/admin).
+// Hace su propia consulta independiente (no depende del array global
+// `pedidos`, que ni siquiera se carga para MSL/ZSL) — RLS ya se encarga
+// de que cada quien solo vea a su propio equipo: admin ve todo, MSL ve
+// sus IBP y los clientes de esos IBP, ZSL ve sus MSL y todo lo de abajo.
+// ============================================================
+async function cargarReportes() {
+  const wrap = document.getElementById('reportesWrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<p class="empty-state">Cargando...</p>';
+
+  const [pedidosRes, perfilesRes] = await Promise.all([
+    supabaseClient.from('pedidos').select('user_id, total, estado, created_at'),
+    supabaseClient.from('profiles').select('id, role, nombre, email, ibp_asignado_id, supervisor_id'),
+  ]);
+
+  if (pedidosRes.error || perfilesRes.error) {
+    wrap.innerHTML = '<p class="empty-state">No se pudo cargar el reporte.</p>';
+    console.error('Error cargando reportes:', pedidosRes.error || perfilesRes.error);
+    return;
+  }
+
+  const pedidosData = pedidosRes.data || [];
+  const perfiles = perfilesRes.data || [];
+  const perfilesPorId = {};
+  perfiles.forEach((p) => (perfilesPorId[p.id] = p));
+
+  // Agrupa cada pedido por el IBP del cliente que lo hizo (vía
+  // ibp_asignado_id). Los pedidos de clientes sin IBP asignado caen en
+  // "Sin IBP asignado", para que no se pierdan del total.
+  const porIbp = {};
+  pedidosData.forEach((pedido) => {
+    const cliente = perfilesPorId[pedido.user_id];
+    const ibpId = cliente?.ibp_asignado_id || null;
+    const ibp = ibpId ? perfilesPorId[ibpId] : null;
+    const clave = ibp ? ibp.id : 'sin_ibp';
+    if (!porIbp[clave]) {
+      porIbp[clave] = {
+        nombre: ibp ? ibp.nombre || ibp.email : 'Sin IBP asignado',
+        mslId: ibp?.supervisor_id || null,
+        totalVentas: 0,
+        totalPedidos: 0,
+      };
+    }
+    porIbp[clave].totalVentas += Number(pedido.total) || 0;
+    porIbp[clave].totalPedidos += 1;
+  });
+
+  const filasIbp = Object.values(porIbp).sort((a, b) => b.totalVentas - a.totalVentas);
+
+  if (filasIbp.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">Todavía no hay pedidos para reportar.</p>';
+    return;
+  }
+
+  const totalGeneral = filasIbp.reduce((acc, f) => acc + f.totalVentas, 0);
+  const totalPedidosGeneral = filasIbp.reduce((acc, f) => acc + f.totalPedidos, 0);
+
+  const filaHtml = (f) => `
+    <div class="order-card">
+      <div class="order-head">
+        <div>
+          <div class="order-cliente">${f.nombre}</div>
+          <div class="order-meta">${f.totalPedidos} pedido(s)</div>
+        </div>
+        <div class="order-total">$${f.totalVentas.toFixed(2)}</div>
+      </div>
+    </div>
+  `;
+
+  // Un ZSL tiene varios MSL a cargo (y admin ve todo) — les sirve un
+  // resumen adicional por MSL antes de bajar al detalle por IBP. Un MSL
+  // ya ve directo el desglose por IBP, no necesita este nivel extra.
+  let reporteMslHtml = '';
+  if (miPerfilAdmin?.role === 'admin' || miPerfilAdmin?.role === 'zsl') {
+    const porMsl = {};
+    filasIbp.forEach((f) => {
+      const msl = f.mslId ? perfilesPorId[f.mslId] : null;
+      const clave = msl ? msl.id : 'sin_msl';
+      if (!porMsl[clave]) {
+        porMsl[clave] = { nombre: msl ? msl.nombre || msl.email : 'Sin MSL asignado', totalVentas: 0, totalPedidos: 0 };
+      }
+      porMsl[clave].totalVentas += f.totalVentas;
+      porMsl[clave].totalPedidos += f.totalPedidos;
+    });
+    const filasMsl = Object.values(porMsl).sort((a, b) => b.totalVentas - a.totalVentas);
+    reporteMslHtml = `
+      <h2 class="category-title">Por MSL</h2>
+      ${filasMsl.map(filaHtml).join('')}
+      <h2 class="category-title">Por IBP</h2>
+    `;
+  }
+
+  wrap.innerHTML = `
+    <div class="order-card">
+      <div class="order-head">
+        <div><div class="order-cliente">Total</div><div class="order-meta">${totalPedidosGeneral} pedido(s)</div></div>
+        <div class="order-total">$${totalGeneral.toFixed(2)}</div>
+      </div>
+    </div>
+    ${reporteMslHtml}
+    ${filasIbp.map(filaHtml).join('')}
+  `;
 }
 
 // ============================================================
