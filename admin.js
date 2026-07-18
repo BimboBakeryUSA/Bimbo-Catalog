@@ -7,6 +7,7 @@
 // entran al panel — solo usan el catálogo.
 let miPerfilAdmin = null;
 const ROLES_PANEL_PERMITIDOS = ['admin', 'msl', 'zsl'];
+const ETIQUETAS_ROL = { admin: 'admin', cliente: 'Cliente', ibp: 'IBP', msl: 'MSL', zsl: 'ZSL' };
 function esAdminPanel() {
   return miPerfilAdmin?.role === 'admin';
 }
@@ -77,10 +78,11 @@ function mostrarPanel() {
   const esAdmin = esAdminPanel();
   document.getElementById('tabPedidos').classList.toggle('hidden', !esAdmin);
   document.getElementById('tabEstantes').classList.toggle('hidden', !esAdmin);
+  document.getElementById('tabActividad').classList.toggle('hidden', !esAdmin);
   document.getElementById('abrirCategoriasBtn').classList.toggle('hidden', !esAdmin);
   if (!esAdmin) {
-    // MSL/ZSL no tienen pestaña de Pedidos ni Estantes — entran directo
-    // a Usuarios.
+    // MSL/ZSL no tienen pestaña de Pedidos, Estantes ni Actividad —
+    // entran directo a Usuarios.
     cambiarPanelAdmin('usuarios');
   }
 
@@ -89,6 +91,7 @@ function mostrarPanel() {
     suscribirseATiempoReal();
     cargarMueblesAdmin();
     cargarSolicitudesMuebleAdmin();
+    cargarActividadAdmin();
   }
   cargarUsuarios();
   // Las categorías deben estar cargadas ANTES de pintar las tarjetas de
@@ -530,7 +533,6 @@ function tarjetaUsuario(u) {
       </div>`
       : '';
 
-  const ETIQUETAS_ROL = { admin: 'admin', ibp: 'IBP', msl: 'MSL', zsl: 'ZSL' };
   const etiquetaBadge = ETIQUETAS_ROL[u.role]
     ? u.role === 'admin'
       ? 'admin'
@@ -930,6 +932,7 @@ function cambiarPanelAdmin(panel) {
   document.getElementById('panelProductos').classList.toggle('hidden', panel !== 'productos');
   document.getElementById('panelReportes').classList.toggle('hidden', panel !== 'reportes');
   document.getElementById('panelEstantes').classList.toggle('hidden', panel !== 'estantes');
+  document.getElementById('panelActividad').classList.toggle('hidden', panel !== 'actividad');
 }
 
 // ============================================================
@@ -1174,18 +1177,17 @@ function tarjetaProductoAdmin(p) {
     )
     .join('');
 
-  // Precio/unidades/activo/nuevo son sensibles al negocio — solo el
-  // admin real los edita. Un MSL/ZSL solo puede tocar las cadenas
-  // autorizadas por producto.
-  const esAdmin = esAdminPanel();
+  // Precio/unidades/activo/nuevo/categoría: admin, MSL y ZSL los pueden
+  // editar todos por igual (decisión de Doug) — el único que se sigue
+  // reservando exclusivamente al admin real es el CRUD de la categoría
+  // en sí (crear/renombrar/eliminar, ver "Gestionar categorías").
   const categoriaActualProducto = p.categoria || 'Otros productos Bimbo';
   const opcionesCategoriaProducto = categoriasAdmin
     .map((c) => c.nombre)
     .concat(categoriasAdmin.some((c) => c.nombre === 'Otros productos Bimbo') ? [] : ['Otros productos Bimbo'])
     .map((nombre) => `<option value="${nombre}" ${nombre === categoriaActualProducto ? 'selected' : ''}>${nombre}</option>`)
     .join('');
-  const camposAdminHtml = esAdmin
-    ? `
+  const camposAdminHtml = `
           <label>Precio<br />
             <input type="number" step="0.01" min="0" class="form-field" data-campo-precio="${p.upc}" value="${p.precio ?? ''}" />
           </label>
@@ -1207,15 +1209,14 @@ function tarjetaProductoAdmin(p) {
             <input type="checkbox" data-campo-nuevo="${p.upc}" ${esNuevo ? 'checked' : ''} />
             <span class="switch"></span>
             <span data-label-nuevo="${p.upc}">${esNuevo ? 'Nuevo ✓' : 'Marcar como nuevo'}</span>
-          </label>`
-    : '';
+          </label>`;
 
   return `
     <div class="order-card prod-admin-card ${inactivo ? 'is-inactivo' : ''}">
       ${fotoHtml}
       <div class="prod-admin-body">
         <div class="order-cliente">${p.producto || '(sin nombre)'}</div>
-        <div class="order-meta">UPC: ${p.upc}${p.marca ? ' · ' + p.marca : ''}${!esAdmin && p.precio != null ? ' · $' + Number(p.precio).toFixed(2) : ''}</div>
+        <div class="order-meta">UPC: ${p.upc}${p.marca ? ' · ' + p.marca : ''}</div>
         <div class="prod-admin-fields">
           ${camposAdminHtml}
           <button data-guardar-producto="${p.upc}">Guardar</button>
@@ -1509,6 +1510,91 @@ async function marcarSolicitudAtendida(id) {
     return;
   }
   await cargarSolicitudesMuebleAdmin();
+}
+
+// ============================================================
+// ACTIVIDAD — solo admin. Búsquedas y productos más vistos vienen de
+// `eventos_actividad` (se agregan aquí mismo en JS, no hay vista SQL
+// para esto); el último acceso viene de `profiles.ultimo_login`.
+// ============================================================
+async function cargarActividadAdmin() {
+  const [eventosRes, perfilesRes] = await Promise.all([
+    supabaseClient.from('eventos_actividad').select('*').order('created_at', { ascending: false }).limit(3000),
+    supabaseClient
+      .from('profiles')
+      .select('id, nombre, tienda_nombre, email, role, ultimo_login')
+      .order('ultimo_login', { ascending: false, nullsFirst: false }),
+  ]);
+
+  if (eventosRes.error) {
+    console.error('Error cargando eventos de actividad:', eventosRes.error);
+  } else {
+    renderTopActividad('actividadBusquedasWrap', eventosRes.data || [], 'busqueda');
+    renderTopActividad('actividadVistosWrap', eventosRes.data || [], 'vista_producto');
+  }
+
+  if (perfilesRes.error) {
+    console.error('Error cargando último acceso:', perfilesRes.error);
+  } else {
+    renderUltimoAcceso(perfilesRes.data || []);
+  }
+}
+
+function renderTopActividad(wrapId, eventos, tipo) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+
+  const conteos = {};
+  eventos
+    .filter((e) => e.tipo === tipo)
+    .forEach((e) => {
+      const clave = e.valor || '(sin valor)';
+      conteos[clave] = (conteos[clave] || 0) + 1;
+    });
+
+  const top = Object.entries(conteos)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20);
+
+  if (top.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">Todavía no hay datos.</p>';
+    return;
+  }
+
+  wrap.innerHTML = top
+    .map(
+      ([valor, conteo], i) => `
+      <div class="order-row-compact">
+        <span style="flex:1;">${i + 1}. ${valor}</span>
+        <span class="order-badge aprobado">${conteo}×</span>
+      </div>`
+    )
+    .join('');
+}
+
+function renderUltimoAcceso(perfiles) {
+  const wrap = document.getElementById('actividadUltimoAccesoWrap');
+  if (!wrap) return;
+
+  if (perfiles.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">No hay usuarios todavía.</p>';
+    return;
+  }
+
+  wrap.innerHTML = perfiles
+    .map((p) => {
+      const fecha = p.ultimo_login ? new Date(p.ultimo_login).toLocaleString() : 'Nunca';
+      const etiquetaRol = ETIQUETAS_ROL[p.role] || p.role;
+      return `
+      <div class="order-row-compact">
+        <div style="flex:1;">
+          <strong>${p.nombre || p.email || '(sin nombre)'}</strong> ${p.tienda_nombre ? '· ' + p.tienda_nombre : ''}
+          <span class="hint-text" style="margin:0;">${etiquetaRol}</span>
+        </div>
+        <span class="hint-text" style="margin:0;">${fecha}</span>
+      </div>`;
+    })
+    .join('');
 }
 
 // ============================================================

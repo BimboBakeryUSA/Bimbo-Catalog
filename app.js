@@ -34,7 +34,44 @@ async function cargarPerfilYEntrar() {
     .eq('id', user.id)
     .maybeSingle();
   perfilActual = perfil;
+  actualizarUltimoLogin();
   await mostrarApp();
+}
+
+// ============================================================
+// ACTIVIDAD — solo la ve el admin (tab "Actividad" en el panel). Tres
+// cosas: cuándo entró/navegó cada quien (ultimo_login), qué buscan
+// (eventos_actividad tipo 'busqueda') y qué productos ven más
+// (tipo 'vista_producto'). Todo "fire and forget": si falla, no
+// interrumpe al cliente ni le muestra ningún error.
+// ============================================================
+function actualizarUltimoLogin() {
+  if (!usuarioActual) return;
+  supabaseClient
+    .from('profiles')
+    .update({ ultimo_login: new Date().toISOString() })
+    .eq('id', usuarioActual.id)
+    .then(() => {});
+}
+
+function registrarEventoActividad(tipo, valor) {
+  if (!usuarioActual || !valor) return;
+  supabaseClient
+    .from('eventos_actividad')
+    .insert({ user_id: usuarioActual.id, tipo, valor })
+    .then(() => {});
+}
+
+// Se registra una búsqueda solo cuando el cliente DEJA de escribir
+// (después de una pausa) — así no se guarda una fila por cada tecla.
+let timeoutBusquedaLog = null;
+function registrarBusquedaConDebounce(texto) {
+  clearTimeout(timeoutBusquedaLog);
+  const limpio = texto.trim();
+  if (!limpio) return;
+  timeoutBusquedaLog = setTimeout(() => {
+    registrarEventoActividad('busqueda', limpio);
+  }, 1200);
 }
 
 async function mostrarApp() {
@@ -922,6 +959,7 @@ function crearTarjetaProducto(producto) {
 function abrirDetalleProducto(slug) {
   const producto = PRODUCTOS.find((p) => p.slug === slug);
   if (!producto) return;
+  registrarEventoActividad('vista_producto', producto.nombre);
 
   const imagenHtml = producto.foto
     ? `<div class="detail-image" style="background:#fff;cursor:zoom-in;" onclick="abrirImagenGrande('${producto.foto.replace(/'/g, "\\'")}', '${producto.nombre.replace(/'/g, "\\'")}')"><img src="${producto.foto}" alt="${producto.nombre}" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;"></div>`
@@ -1320,6 +1358,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('searchInput').addEventListener('input', (e) => {
     textoBusqueda = e.target.value;
     renderCatalogo();
+    registrarBusquedaConDebounce(textoBusqueda);
   });
 
   document.getElementById('cartBtn').addEventListener('click', () => {
