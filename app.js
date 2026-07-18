@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v23 — Productos fuera de tu cadena se ven pálidos';
+const VERSION = 'v24 — Dashboard visible para MSL/ZSL en el catálogo';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -41,6 +41,11 @@ async function mostrarApp() {
   document.getElementById('authView').classList.add('hidden');
 
   const esAdmin = perfilActual?.role === 'admin';
+  // Admin, MSL y ZSL entran al catálogo normal igual que un cliente, pero
+  // además deben poder encontrar el panel — se les muestra el link
+  // "Dashboard" en su menú de perfil (apunta a admin.html). IBP y cliente
+  // no lo ven porque no tienen panel.
+  const tienePanelAdmin = ['admin', 'msl', 'zsl'].includes(perfilActual?.role);
   if (!esAdmin && perfilActual?.estado_cuenta !== 'aprobado') {
     mostrarPendiente();
     return;
@@ -59,8 +64,8 @@ async function mostrarApp() {
   renderCatalogo();
   actualizarBadge();
   initProfileMenu({
-    linkPedidos: esAdmin,
-    linkMisPedidos: !esAdmin,
+    linkPedidos: tienePanelAdmin,
+    linkMisPedidos: !tienePanelAdmin,
     onLogout: async () => {
       await supabaseClient.auth.signOut();
       location.reload();
