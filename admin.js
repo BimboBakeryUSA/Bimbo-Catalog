@@ -344,6 +344,9 @@ function renderUsuarios() {
   wrap.querySelectorAll('[data-hacer-admin]').forEach((btn) => {
     btn.addEventListener('click', () => hacerAdmin(btn.dataset.hacerAdmin));
   });
+  wrap.querySelectorAll('[data-resetear-acceso]').forEach((btn) => {
+    btn.addEventListener('click', () => abrirModalResetearAcceso(btn.dataset.resetearAcceso));
+  });
   wrap.querySelectorAll('[data-expandir-usuario]').forEach((el) => {
     el.addEventListener('click', () => {
       const id = el.dataset.expandirUsuario;
@@ -400,6 +403,7 @@ function tarjetaUsuario(u) {
     if (u.estado_cuenta === 'aprobado') {
       acciones.push(`<button data-rechazar="${u.id}">Rechazar</button>`);
       acciones.push(`<button data-hacer-admin="${u.id}">Hacer admin</button>`);
+      acciones.push(`<button data-resetear-acceso="${u.id}">Resetear acceso</button>`);
       acciones.push(`<button data-expandir-usuario="${u.id}">Minimizar</button>`);
     }
   }
@@ -612,6 +616,109 @@ async function crearUsuarioClick() {
   } catch (err) {
     btn.disabled = false;
     btn.textContent = 'Crear usuario';
+    msgEl.textContent = '✕ ' + String(err);
+    msgEl.style.color = '#c0392b';
+  }
+}
+
+// ============================================================
+// RESETEAR ACCESO de un usuario ya existente — para cuando una
+// invitación se rompió (ej. el link mandó a localhost), se le olvidó
+// la contraseña, o simplemente quieres dársela tú directo. Mismo
+// patrón que "Crear usuario": o le pones tú la contraseña, o le
+// reenvías la invitación por correo.
+// ============================================================
+let resetearAccesoEmailActual = '';
+
+function abrirModalResetearAcceso(id) {
+  const u = usuarios.find((x) => x.id === id);
+  if (!u || !u.email) return;
+  resetearAccesoEmailActual = u.email;
+  document.getElementById('resetearAccesoEmail').textContent = `Cuenta: ${u.email}`;
+  document.getElementById('resetearAccesoTipo').value = 'password';
+  document.getElementById('resetearAccesoPassword').value = '';
+  const msgEl = document.getElementById('resetearAccesoMsg');
+  msgEl.textContent = '';
+  msgEl.style.color = '';
+  actualizarCamposResetearAcceso();
+  abrirModal('resetearAccesoModal');
+}
+
+function actualizarCamposResetearAcceso() {
+  const esPassword = document.getElementById('resetearAccesoTipo').value === 'password';
+  document.getElementById('resetearAccesoPassword').classList.toggle('hidden', !esPassword);
+}
+
+async function resetearAccesoClick() {
+  const btn = document.getElementById('resetearAccesoBtn');
+  const msgEl = document.getElementById('resetearAccesoMsg');
+  const tipo = document.getElementById('resetearAccesoTipo').value;
+  const password = document.getElementById('resetearAccesoPassword').value;
+  const enviarInvitacion = tipo === 'invitar';
+
+  if (!enviarInvitacion && (!password || password.length < 6)) {
+    msgEl.textContent = 'Escribe una contraseña de al menos 6 caracteres, o cambia a "Reenviar invitación".';
+    msgEl.style.color = '#c0392b';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Aplicando...';
+  msgEl.textContent = '';
+  msgEl.style.color = '';
+
+  const {
+    data: { session },
+  } = await supabaseClient.auth.getSession();
+  const token = session?.access_token;
+  if (!token) {
+    msgEl.textContent = 'Sesión expirada, vuelve a iniciar sesión.';
+    msgEl.style.color = '#c0392b';
+    btn.disabled = false;
+    btn.textContent = 'Confirmar';
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('admin-reset-access', {
+      body: {
+        email: resetearAccesoEmailActual,
+        enviar_invitacion: enviarInvitacion,
+        password: enviarInvitacion ? undefined : password,
+      },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'Confirmar';
+
+    if (error) {
+      let mensaje = error.message || 'Error reseteando el acceso';
+      try {
+        const ctx = await error.context?.json?.();
+        if (ctx?.error) mensaje = ctx.error;
+      } catch {
+        // si no se puede leer el detalle, se queda con el mensaje genérico
+      }
+      msgEl.textContent = '✕ ' + mensaje;
+      msgEl.style.color = '#c0392b';
+      return;
+    }
+    if (data?.error) {
+      msgEl.textContent = '✕ ' + data.error;
+      msgEl.style.color = '#c0392b';
+      return;
+    }
+
+    if (enviarInvitacion) {
+      msgEl.textContent = `✓ Invitación reenviada a ${resetearAccesoEmailActual}.`;
+    } else {
+      msgEl.textContent = `✓ Contraseña actualizada. Usuario: ${resetearAccesoEmailActual} — Contraseña: ${password} (cópiala, no se vuelve a mostrar).`;
+    }
+    msgEl.style.color = '#2e7d32';
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Confirmar';
     msgEl.textContent = '✕ ' + String(err);
     msgEl.style.color = '#c0392b';
   }
@@ -926,6 +1033,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('nuevoUsuarioTipo').addEventListener('change', actualizarCamposCrearUsuario);
   document.getElementById('nuevoUsuarioAcceso').addEventListener('change', actualizarCamposCrearUsuario);
   document.getElementById('crearUsuarioBtn').addEventListener('click', crearUsuarioClick);
+
+  document.getElementById('resetearAccesoTipo').addEventListener('change', actualizarCamposResetearAcceso);
+  document.getElementById('resetearAccesoBtn').addEventListener('click', resetearAccesoClick);
 
   document.getElementById('productosBusqueda').addEventListener('input', (e) => {
     busquedaProductosAdmin = e.target.value;

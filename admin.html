@@ -160,10 +160,29 @@
     </div>
   </div>
 
+  <!-- Modal: resetear acceso de un usuario ya existente (invitación con
+       link roto, olvidó su contraseña, etc.) -->
+  <div id="resetearAccesoModal" class="modal hidden">
+    <div class="modal-card">
+      <button class="modal-close" data-close="resetearAccesoModal">✕</button>
+      <h2>Resetear acceso</h2>
+      <p class="hint-text" style="margin-top:0;" id="resetearAccesoEmail"></p>
+
+      <select class="form-field" id="resetearAccesoTipo">
+        <option value="password">Ponerle contraseña nueva yo mismo</option>
+        <option value="invitar">Reenviar invitación por correo</option>
+      </select>
+      <input class="form-field" id="resetearAccesoPassword" type="text" placeholder="Contraseña nueva (mínimo 6 caracteres)" />
+
+      <p id="resetearAccesoMsg" class="hint-text" style="margin-top:8px;"></p>
+      <button class="btn-primary" id="resetearAccesoBtn">Confirmar</button>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="i18n.js?v=3"></script>
   <script src="config.js?v=13"></script>
   <script src="profile-menu.js?v=15"></script>
-  <script src="admin.js?v=18"></script>
+  <script src="admin.js?v=19"></script>
 </body>
 </html>
