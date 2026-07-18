@@ -120,6 +120,14 @@ function asegurarModalPerfil() {
       <p id="perfilError" class="error-text hidden"></p>
       <p id="perfilOk" class="hint-text hidden" style="color:#0F8A3D;">✓ Datos guardados.</p>
       <button class="btn-primary" id="perfilGuardarBtn">Guardar cambios</button>
+
+      <hr class="modal-divider" />
+      <h3 class="modal-section-title" id="perfilPasswordTitulo">Cambiar contraseña</h3>
+      <input class="form-field" id="perfilPasswordNueva" type="password" placeholder="Contraseña nueva" autocomplete="new-password" />
+      <input class="form-field" id="perfilPasswordConfirmar" type="password" placeholder="Confirmar contraseña nueva" autocomplete="new-password" />
+      <p id="perfilPasswordError" class="error-text hidden"></p>
+      <p id="perfilPasswordOk" class="hint-text hidden" style="color:#0F8A3D;">✓ Contraseña actualizada.</p>
+      <button class="btn-secondary" id="perfilPasswordBtn">Cambiar contraseña</button>
     </div>
   `;
 
@@ -135,6 +143,11 @@ function asegurarModalPerfil() {
     modal.querySelector('#perfilCadenaDefault').textContent = t('regCadenaDefault');
     modal.querySelector('#perfilOk').textContent = '✓ ' + t('perfilOk').replace(/^✓\s*/, '');
     modal.querySelector('#perfilGuardarBtn').textContent = t('perfilGuardarBtn');
+    modal.querySelector('#perfilPasswordTitulo').textContent = t('perfilPasswordTitulo');
+    modal.querySelector('#perfilPasswordNueva').placeholder = t('perfilPasswordNuevaPh');
+    modal.querySelector('#perfilPasswordConfirmar').placeholder = t('perfilPasswordConfirmarPh');
+    modal.querySelector('#perfilPasswordOk').textContent = '✓ ' + t('perfilPasswordOk').replace(/^✓\s*/, '');
+    modal.querySelector('#perfilPasswordBtn').textContent = t('perfilPasswordBtn');
   }
   document.body.appendChild(modal);
 
@@ -159,6 +172,7 @@ function asegurarModalPerfil() {
   });
   document.getElementById('perfilModalCerrar').addEventListener('click', () => modal.classList.add('hidden'));
   document.getElementById('perfilGuardarBtn').addEventListener('click', guardarPerfilPropio);
+  document.getElementById('perfilPasswordBtn').addEventListener('click', cambiarPasswordPropio);
 }
 
 async function abrirModalPerfil() {
@@ -186,6 +200,15 @@ async function abrirModalPerfil() {
   btn.dataset.userId = user.id;
   btn.disabled = false;
   btn.textContent = typeof t === 'function' ? t('perfilGuardarBtn') : 'Guardar cambios';
+
+  // Cambiar contraseña — siempre vacío al abrir, nunca se precarga nada.
+  document.getElementById('perfilPasswordNueva').value = '';
+  document.getElementById('perfilPasswordConfirmar').value = '';
+  document.getElementById('perfilPasswordError').classList.add('hidden');
+  document.getElementById('perfilPasswordOk').classList.add('hidden');
+  const passBtn = document.getElementById('perfilPasswordBtn');
+  passBtn.disabled = false;
+  passBtn.textContent = typeof t === 'function' ? t('perfilPasswordBtn') : 'Cambiar contraseña';
 
   document.getElementById('perfilModal').classList.remove('hidden');
 }
@@ -237,6 +260,58 @@ async function guardarPerfilPropio() {
     errorEl.classList.remove('hidden');
     return;
   }
+  okEl.classList.remove('hidden');
+  setTimeout(() => {
+    okEl.classList.add('hidden');
+  }, 2500);
+}
+
+// ============================================================
+// Cambiar mi propia contraseña — autoservicio, sin pasar por el admin.
+// Como el usuario ya tiene una sesión activa, Supabase permite ponerle
+// la contraseña nueva directo (auth.updateUser), sin pedir la anterior
+// ni necesitar ninguna Edge Function ni el service role.
+// ============================================================
+async function cambiarPasswordPropio() {
+  const btn = document.getElementById('perfilPasswordBtn');
+  const errorEl = document.getElementById('perfilPasswordError');
+  const okEl = document.getElementById('perfilPasswordOk');
+  const nueva = document.getElementById('perfilPasswordNueva').value;
+  const confirmar = document.getElementById('perfilPasswordConfirmar').value;
+
+  okEl.classList.add('hidden');
+
+  if (!nueva || !confirmar) {
+    errorEl.textContent = typeof t === 'function' ? t('perfilPasswordErrorEmpty') : 'Completa ambos campos.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  if (nueva.length < 6) {
+    errorEl.textContent = typeof t === 'function' ? t('authErrorPasswordLength') : 'La contraseña debe tener al menos 6 caracteres.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  if (nueva !== confirmar) {
+    errorEl.textContent = typeof t === 'function' ? t('perfilPasswordErrorMismatch') : 'Las contraseñas no coinciden.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  errorEl.classList.add('hidden');
+
+  btn.disabled = true;
+  btn.textContent = typeof t === 'function' ? t('perfilPasswordBtnLoading') : 'Actualizando...';
+  const { error } = await supabaseClient.auth.updateUser({ password: nueva });
+  btn.disabled = false;
+  btn.textContent = typeof t === 'function' ? t('perfilPasswordBtn') : 'Cambiar contraseña';
+
+  if (error) {
+    errorEl.textContent = (typeof t === 'function' ? t('perfilPasswordErrorSave') : 'No se pudo actualizar: ') + error.message;
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('perfilPasswordNueva').value = '';
+  document.getElementById('perfilPasswordConfirmar').value = '';
   okEl.classList.remove('hidden');
   setTimeout(() => {
     okEl.classList.add('hidden');

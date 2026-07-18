@@ -368,6 +368,9 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+.modal-divider { border: none; border-top: 1px solid var(--line); margin: 20px 0 16px; }
+.modal-section-title { font-size: 0.95rem; font-weight: 700; margin: 0 0 10px; color: var(--ink); }
+
 .modal-close {
   position: absolute;
   top: 16px;
