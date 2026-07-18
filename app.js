@@ -13,6 +13,19 @@ const VERSION = 'v24 — Dashboard visible para MSL/ZSL en el catálogo';
 let perfilActual = null;
 let usuarioActual = null;
 
+// Deep link a un producto compartido (?p=slug) — se captura apenas carga
+// el script (antes de saber si hay sesión o no) y se guarda para abrirlo
+// en cuanto el catálogo esté listo, ya sea que el usuario ya tenía sesión
+// o que tenga que iniciarla/registrarse primero.
+(function capturarProductoCompartido() {
+  try {
+    const slug = new URLSearchParams(location.search).get('p');
+    if (slug) sessionStorage.setItem('productoCompartido', slug);
+  } catch {
+    // sessionStorage no disponible (modo privado estricto, etc.) — no es crítico
+  }
+})();
+
 async function mostrarSegunSesion() {
   const { data } = await supabaseClient.auth.getSession();
   if (data.session) {
@@ -64,6 +77,10 @@ function registrarEventoActividad(tipo, valor) {
 
 // Se registra una búsqueda solo cuando el cliente DEJA de escribir
 // (después de una pausa) — así no se guarda una fila por cada tecla.
+// De paso, si esa búsqueda no encontró NADA, se registra aparte como
+// 'busqueda_sin_resultado' — así el admin ve en la pestaña Actividad qué
+// término le falta al catálogo (ej. "pan de molde" si nadie le puso ese
+// alias a ningún producto todavía).
 let timeoutBusquedaLog = null;
 function registrarBusquedaConDebounce(texto) {
   clearTimeout(timeoutBusquedaLog);
@@ -71,6 +88,11 @@ function registrarBusquedaConDebounce(texto) {
   if (!limpio) return;
   timeoutBusquedaLog = setTimeout(() => {
     registrarEventoActividad('busqueda', limpio);
+    const textoNorm = limpio.toLowerCase();
+    const hayResultados = PRODUCTOS.some((p) => coincideBusqueda(p, textoNorm));
+    if (!hayResultados) {
+      registrarEventoActividad('busqueda_sin_resultado', limpio);
+    }
   }, 1200);
 }
 
@@ -96,7 +118,7 @@ async function mostrarApp() {
   }
 
   document.getElementById('appShell').classList.remove('hidden');
-  await Promise.all([cargarProductos(), cargarCategoriasCatalogo(), cargarMuebles()]);
+  await Promise.all([cargarProductos(), cargarCategoriasCatalogo(), cargarMuebles(), cargarFavoritos()]);
   renderChips();
   renderCatalogo();
   actualizarBadge();
@@ -108,6 +130,26 @@ async function mostrarApp() {
       location.reload();
     },
   });
+  abrirProductoCompartidoSiExiste();
+}
+
+// Si el catálogo se abrió desde un link compartido (?p=slug), abre el
+// detalle de ese producto en cuanto todo esté cargado. Funciona tanto si
+// ya había sesión como si el usuario tuvo que iniciarla/registrarse
+// primero (el slug queda guardado en sessionStorage desde que cargó el
+// script, ver capturarProductoCompartido() arriba).
+function abrirProductoCompartidoSiExiste() {
+  let slug = null;
+  try {
+    slug = sessionStorage.getItem('productoCompartido');
+    if (slug) sessionStorage.removeItem('productoCompartido');
+  } catch {
+    return;
+  }
+  if (!slug) return;
+  if (PRODUCTOS.some((p) => p.slug === slug)) {
+    abrirDetalleProducto(slug);
+  }
 }
 
 let canalMiPerfil = null;
@@ -298,6 +340,68 @@ async function cargarMuebles() {
   }
 }
 
+// ============================================================
+// FAVORITOS — corazón en la tarjeta/detalle + chip "Mis favoritos". Vive
+// en catalogo-bimbo (junto con auth), guardado por UPC (no hace falta
+// cruzar con bimbo-inventory-pro). También le sirve al admin como señal
+// de qué productos le gustan más a la gente (pestaña Actividad).
+// ============================================================
+let FAVORITOS = new Set();
+
+async function cargarFavoritos() {
+  if (!usuarioActual) {
+    FAVORITOS = new Set();
+    return;
+  }
+  try {
+    const { data, error } = await supabaseClient.from('favoritos').select('product_upc').eq('user_id', usuarioActual.id);
+    if (error) throw error;
+    FAVORITOS = new Set((data || []).map((f) => f.product_upc));
+  } catch (err) {
+    console.error('Error cargando favoritos:', err);
+    FAVORITOS = new Set();
+  }
+}
+
+// Optimista: cambia el estado local y refresca la UI de inmediato, y
+// solo si falla el guardado en Supabase se revierte. Vuelve a pintar
+// chips (por si "Mis favoritos" aparece/desaparece) y el catálogo.
+async function toggleFavorito(slug, nombre) {
+  if (!usuarioActual) return;
+  const yaEsFavorito = FAVORITOS.has(slug);
+
+  if (yaEsFavorito) {
+    FAVORITOS.delete(slug);
+  } else {
+    FAVORITOS.add(slug);
+  }
+  renderChips();
+  renderCatalogo();
+  actualizarCorazonesDetalle();
+
+  const { error } = yaEsFavorito
+    ? await supabaseClient.from('favoritos').delete().eq('user_id', usuarioActual.id).eq('product_upc', slug)
+    : await supabaseClient.from('favoritos').insert({ user_id: usuarioActual.id, product_upc: slug, product_nombre: nombre });
+
+  if (error) {
+    console.error('Error guardando favorito:', error);
+    // revertir el cambio optimista
+    if (yaEsFavorito) FAVORITOS.add(slug);
+    else FAVORITOS.delete(slug);
+    renderChips();
+    renderCatalogo();
+    actualizarCorazonesDetalle();
+  }
+}
+
+// Si el modal de detalle está abierto para este mismo producto, actualiza
+// su corazón también (renderCatalogo no toca el modal).
+function actualizarCorazonesDetalle() {
+  const btn = document.getElementById('detailHeartBtn');
+  if (!btn || !btn.dataset.slug) return;
+  btn.textContent = FAVORITOS.has(btn.dataset.slug) ? '❤️' : '🤍';
+}
+
 // Paleta de colores solo para el fondo de la tarjeta cuando no hay foto
 // real todavía. Es puramente cosmético — no se guarda en la base.
 const PALETA_COLORES = ['#FBEFD9', '#F0E4CB', '#FCE9DE', '#FBF0D3', '#FBE4E9', '#F4E6CE', '#F8EFDA', '#FBDFE2'];
@@ -334,6 +438,60 @@ const ICONOS_CATEGORIA = {
 // se muestran igual en ambos idiomas).
 function displayCategoria(categoria) {
   return categoria === CATEGORIA_DEFAULT ? t('categoriaOtros') : categoria;
+}
+
+// ============================================================
+// BÚSQUEDA CON SINÓNIMOS — el nombre oficial del producto en la base
+// (ej. "Pan Grande Blanco") no siempre coincide con cómo lo pide el
+// cliente (ej. "pan de molde", "white bread"). Este diccionario cubre
+// términos genéricos comunes; para casos específicos de un producto en
+// particular, cada producto también tiene su propio campo
+// `palabras_clave` editable desde el panel (Productos), que se suma al
+// texto contra el que se compara.
+//
+// La clave debe ser la frase completa tal como la escribiría el
+// cliente (en minúsculas) — no hace falta que sea exhaustivo, se puede
+// seguir ampliando aquí según lo que la gente busque y no encuentre (ver
+// "Búsquedas sin resultados" en la pestaña Actividad del panel).
+// ============================================================
+const SINONIMOS_BUSQUEDA = {
+  'pan de molde': ['pan blanco', 'sandwich', 'wonder'],
+  'pan blanco': ['pan de molde', 'sandwich', 'wonder'],
+  'white bread': ['pan blanco', 'pan de molde', 'sandwich'],
+  'sandwich bread': ['pan blanco', 'pan de molde', 'sandwich'],
+  pan: ['bread'],
+  bread: ['pan'],
+  tortillas: ['tortilla', 'wraps'],
+  tortilla: ['tortillas', 'wrap'],
+  donas: ['donuts', 'dona'],
+  donuts: ['donas', 'dona'],
+  donut: ['dona', 'donas'],
+  pastelitos: ['cakes', 'ponque', 'gansito'],
+  cakes: ['pastelitos', 'ponque'],
+  chips: ['papas', 'frituras', 'botana'],
+  papas: ['chips', 'frituras', 'botana'],
+  frituras: ['chips', 'papas', 'botana'],
+  botana: ['chips', 'papas', 'frituras', 'snacks'],
+  snacks: ['botana', 'chips'],
+  bolillo: ['pan blanco', 'bread roll'],
+  muffins: ['panque', 'panquecito'],
+  panque: ['muffins', 'panquecito'],
+};
+
+// Texto contra el que se compara la búsqueda de un producto: su nombre +
+// sus palabras clave (alias del panel de admin), todo en minúsculas.
+function textoBusquedaProducto(producto) {
+  return `${producto.nombre} ${(producto.palabrasClave || []).join(' ')}`.toLowerCase();
+}
+
+// texto ya debe venir en minúsculas y sin espacios sobrantes (ver
+// llamadas de esta función en renderCatalogo/registrarBusquedaConDebounce).
+function coincideBusqueda(producto, texto) {
+  if (!texto) return true;
+  const haystack = textoBusquedaProducto(producto);
+  if (haystack.includes(texto)) return true;
+  const sinonimos = SINONIMOS_BUSQUEDA[texto] || [];
+  return sinonimos.some((s) => haystack.includes(s));
 }
 
 // ============================================================
@@ -419,6 +577,8 @@ function mapProductoDB(row) {
     // Cadenas donde está autorizado (por defecto solo Independientes).
     cadenasPermitidas: Array.isArray(row.cadenas_permitidas) ? row.cadenas_permitidas : [],
     esNuevo: !!row.es_nuevo,
+    // Alias de búsqueda editables desde el panel (ver SINONIMOS_BUSQUEDA).
+    palabrasClave: Array.isArray(row.palabras_clave) ? row.palabras_clave : [],
   };
 }
 
@@ -477,7 +637,7 @@ async function cargarProductos() {
     await cargarPrefijosMarca();
     const { data, error } = await productsSupabaseClient
       .from('products')
-      .select('upc, sku, producto, precio, unidades_caja, unidades_pallet, foto, activo, marca, ventas_totales, cadenas_permitidas, es_nuevo, categoria')
+      .select('upc, sku, producto, precio, unidades_caja, unidades_pallet, foto, activo, marca, ventas_totales, cadenas_permitidas, es_nuevo, categoria, palabras_clave')
       .eq('activo', true)
       .not('precio', 'is', null)
       .gt('precio', 0)
@@ -507,6 +667,13 @@ const STORAGE_KEY = 'catalogo-bimbo-carrito';
 let carrito = cargarCarrito();
 let categoriaActiva = 'Todas';
 let textoBusqueda = '';
+
+// Precios "tocados" en esta visita — cada producto empieza con el precio
+// oculto en la tarjeta del catálogo (chip "Toca para ver precio"); al
+// tocarlo se revela y queda registrado como evento 'ver_precio' (junto con
+// 'vista_producto', le da al admin una señal de qué le interesa más a la
+// gente). Se reinicia en cada carga de página — no se guarda.
+let PRECIOS_REVELADOS = new Set();
 
 function cargarCarrito() {
   try {
@@ -609,6 +776,7 @@ function labelChip(cat) {
   if (cat === 'Todas') return t('chipTodas');
   if (cat === 'Novedades') return t('seccionNuevosTitulo');
   if (cat === 'Populares') return t('seccionPopularesTitulo');
+  if (cat === 'Favoritos') return t('chipFavoritos');
   if (cat === 'Estantes') return t('chipEstantes');
   return displayCategoria(cat);
 }
@@ -617,11 +785,13 @@ function renderChips() {
   const wrap = document.getElementById('chipsWrap');
   const tieneNuevos = PRODUCTOS.some((p) => p.esNuevo);
   const tienePopulares = PRODUCTOS.some((p) => p.esHot);
+  const tieneFavoritos = FAVORITOS.size > 0;
   const tieneEstantes = MUEBLES.length > 0;
   const categorias = [
     'Todas',
     ...(tieneNuevos ? ['Novedades'] : []),
     ...(tienePopulares ? ['Populares'] : []),
+    ...(tieneFavoritos ? ['Favoritos'] : []),
     ...getCategorias(),
     // "Estantes" (muebles) siempre al final, como pidió Doug.
     ...(tieneEstantes ? ['Estantes'] : []),
@@ -860,19 +1030,24 @@ function renderCatalogo() {
     }
   }
 
-  if (categoriaActiva === 'Novedades' || categoriaActiva === 'Populares') {
-    // Pestaña "Novedades" o "Populares" activa: se comportan como una
+  if (categoriaActiva === 'Novedades' || categoriaActiva === 'Populares' || categoriaActiva === 'Favoritos') {
+    // "Novedades", "Populares" y "Favoritos" se comportan como una
     // categoría más (tarjeta completa con precio y botón Agregar), y
     // también respetan el buscador.
-    const base = categoriaActiva === 'Novedades' ? PRODUCTOS.filter((p) => p.esNuevo) : PRODUCTOS.filter((p) => p.esHot);
-    const filtrados = base.filter((p) => p.nombre.toLowerCase().includes(texto));
+    const base =
+      categoriaActiva === 'Novedades'
+        ? PRODUCTOS.filter((p) => p.esNuevo)
+        : categoriaActiva === 'Populares'
+          ? PRODUCTOS.filter((p) => p.esHot)
+          : PRODUCTOS.filter((p) => FAVORITOS.has(p.slug));
+    const filtrados = base.filter((p) => coincideBusqueda(p, texto));
     if (filtrados.length > 0) {
       wrap.appendChild(crearSeccionGrid(labelChip(categoriaActiva), filtrados));
       algoRenderizado = true;
     }
   } else {
     const productosFiltrados = PRODUCTOS.filter((p) => {
-      const coincideTexto = p.nombre.toLowerCase().includes(texto);
+      const coincideTexto = coincideBusqueda(p, texto);
       const coincideCategoria = categoriaActiva === 'Todas' || p.categoria === categoriaActiva;
       return coincideTexto && coincideCategoria;
     });
@@ -914,19 +1089,45 @@ function crearTarjetaProducto(producto) {
   image.onclick = () => abrirDetalleProducto(producto.slug);
 
   const unidadLabel = producto.ventaPorCaja ? t('unidadCaja', producto.unidadesCaja) : t('unidadPieza');
+  const esFavorito = FAVORITOS.has(producto.slug);
+  const precioRevelado = PRECIOS_REVELADOS.has(producto.slug);
+  const precioRowHtml = precioRevelado
+    ? `<div style="text-align:right;">
+        <span class="card-price">$${producto.precio.toFixed(2)}</span>
+        <span class="card-price-unit">${unidadLabel}</span>
+      </div>`
+    : `<button type="button" class="card-price-oculto" data-revelar-precio="${producto.slug}">
+        <span class="card-price-oculto-icon">👁</span>${t('tocaVerPrecio')}
+      </button>`;
   const body = document.createElement('div');
   body.className = 'card-body';
   body.innerHTML = `
-    <span class="card-category">${displayCategoria(producto.categoria)}</span>
+    <div class="card-category-row">
+      <span class="card-category">${displayCategoria(producto.categoria)}</span>
+      ${usuarioActual ? `<button type="button" class="card-heart-btn" data-favorito="${producto.slug}" aria-label="Favorito">${esFavorito ? '❤️' : '🤍'}</button>` : ''}
+    </div>
     <span class="card-name">${producto.nombre}</span>
     <div class="card-price-row">
-      <div style="text-align:right;">
-        <span class="card-price">$${producto.precio.toFixed(2)}</span>
-        <span class="card-price-unit">${unidadLabel}</span>
-      </div>
+      ${precioRowHtml}
     </div>
   `;
   body.querySelector('.card-name').onclick = () => abrirDetalleProducto(producto.slug);
+
+  const heartBtn = body.querySelector('[data-favorito]');
+  if (heartBtn) {
+    heartBtn.onclick = (e) => {
+      e.stopPropagation();
+      toggleFavorito(producto.slug, producto.nombre);
+    };
+  }
+
+  const precioOcultoBtn = body.querySelector('[data-revelar-precio]');
+  if (precioOcultoBtn) {
+    precioOcultoBtn.onclick = (e) => {
+      e.stopPropagation();
+      revelarPrecioTarjeta(producto.slug, precioOcultoBtn.closest('.card-price-row'), unidadLabel);
+    };
+  }
 
   if (noDisponible) {
     // Sin botón de Agregar — solo un aviso. El producto sigue siendo
@@ -953,6 +1154,26 @@ function crearTarjetaProducto(producto) {
   return card;
 }
 
+// Revela el precio de una tarjeta del catálogo al tocarlo — sustituye el
+// chip "Toca para ver precio" por el precio real, sin volver a pintar
+// todo el catálogo. Queda revelado solo durante esta visita (se reinicia
+// al recargar la página) y registra el evento 'ver_precio' — junto con
+// 'vista_producto' (abrir el detalle), le da al admin una señal de qué
+// producto le interesa más a la gente sin estorbarle la compra.
+function revelarPrecioTarjeta(slug, wrapEl, unidadLabel) {
+  if (!wrapEl || PRECIOS_REVELADOS.has(slug)) return;
+  const producto = PRODUCTOS.find((p) => p.slug === slug);
+  if (!producto) return;
+  PRECIOS_REVELADOS.add(slug);
+  registrarEventoActividad('ver_precio', producto.nombre);
+  wrapEl.innerHTML = `
+    <div style="text-align:right;">
+      <span class="card-price">$${producto.precio.toFixed(2)}</span>
+      <span class="card-price-unit">${unidadLabel}</span>
+    </div>
+  `;
+}
+
 // ============================================================
 // MODAL: DETALLE DE PRODUCTO
 // ============================================================
@@ -960,6 +1181,13 @@ function abrirDetalleProducto(slug) {
   const producto = PRODUCTOS.find((p) => p.slug === slug);
   if (!producto) return;
   registrarEventoActividad('vista_producto', producto.nombre);
+  // Entrar al detalle también cuenta como "vio el precio" (aquí siempre
+  // se muestra completo) — junto con tocar el precio en la tarjeta, es la
+  // otra vía que cuenta para la señal 'ver_precio'.
+  if (!PRECIOS_REVELADOS.has(slug)) {
+    PRECIOS_REVELADOS.add(slug);
+    registrarEventoActividad('ver_precio', producto.nombre);
+  }
 
   const imagenHtml = producto.foto
     ? `<div class="detail-image" style="background:#fff;cursor:zoom-in;" onclick="abrirImagenGrande('${producto.foto.replace(/'/g, "\\'")}', '${producto.nombre.replace(/'/g, "\\'")}')"><img src="${producto.foto}" alt="${producto.nombre}" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;"></div>`
@@ -1023,6 +1251,11 @@ function abrirDetalleProducto(slug) {
     ? `<p class="detail-no-disponible-msg">${t('detailNoDisponibleMsg')}</p>`
     : `<button class="btn-primary" id="detailAddBtn">${t('detailAddBtn')}</button>`;
 
+  const esFavorito = FAVORITOS.has(producto.slug);
+  const heartHtml = usuarioActual
+    ? `<button type="button" class="detail-heart-btn" id="detailHeartBtn" data-slug="${producto.slug}" aria-label="Favorito">${esFavorito ? '❤️' : '🤍'}</button>`
+    : '';
+
   const body = document.getElementById('productModalBody');
   body.innerHTML = `
     ${imagenHtml}
@@ -1031,6 +1264,7 @@ function abrirDetalleProducto(slug) {
         <span class="detail-category">${displayCategoria(producto.categoria)}</span>
         ${producto.esHot ? `<span class="detail-hot-tag">${t('detailHotTag')}</span>` : ''}
         ${noDisponible ? `<span class="detail-lock-tag">${t('detailNoDisponibleTag')}</span>` : ''}
+        ${heartHtml}
         <h2 class="detail-name">${producto.nombre}</h2>
       </div>
       <div>
@@ -1042,7 +1276,14 @@ function abrirDetalleProducto(slug) {
     ${datasheetHtml}
     ${cadenasHtml}
     ${accionHtml}
+    <button class="btn-secondary" id="detailShareBtn" style="margin-top:8px;">${t('btnCompartir')}</button>
   `;
+
+  const heartBtn = document.getElementById('detailHeartBtn');
+  if (heartBtn) {
+    heartBtn.onclick = () => toggleFavorito(producto.slug, producto.nombre);
+  }
+  document.getElementById('detailShareBtn').onclick = () => compartirProducto(producto);
 
   if (producto.upcCompleto && window.JsBarcode) {
     try {
@@ -1068,6 +1309,39 @@ function abrirDetalleProducto(slug) {
     };
   }
   abrirModal('productModal');
+}
+
+// ============================================================
+// COMPARTIR PRODUCTO — usa el selector nativo del teléfono (WhatsApp,
+// SMS, lo que tenga instalado el cliente) vía la Web Share API. En
+// desktop, donde no siempre existe, cae a copiar el enlace al
+// portapapeles. El enlace lleva un ?p=<upc> que abre el detalle de este
+// producto directo al cargar (ver capturarProductoCompartido() arriba),
+// incluso si quien lo recibe todavía no tiene sesión iniciada.
+// ============================================================
+function urlProducto(slug) {
+  return `${location.origin}${location.pathname}?p=${encodeURIComponent(slug)}`;
+}
+
+async function compartirProducto(producto) {
+  const url = urlProducto(producto.slug);
+  const titulo = `${producto.nombre} — Catálogo Bimbo`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: titulo, url });
+    } catch {
+      // el usuario cerró el selector sin elegir nada — no es un error
+    }
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(url);
+    alert(t('enlaceCopiado'));
+  } catch {
+    window.open(`https://wa.me/?text=${encodeURIComponent(titulo + ' ' + url)}`, '_blank');
+  }
 }
 
 // ============================================================

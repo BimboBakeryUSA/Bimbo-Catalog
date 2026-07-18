@@ -493,7 +493,7 @@ function tarjetaUsuario(u) {
       ? `
       <div class="order-meta" style="margin-top:6px;">
         Cadena:
-        <select class="form-field" style="display:inline-block; width:auto; margin-left:4px;" data-campo-cadena-usuario="${u.id}">
+        <select class="form-field inline-select-wide" data-campo-cadena-usuario="${u.id}">
           <option value="">(sin asignar — ve todo)</option>
           ${(typeof CADENAS !== 'undefined' ? CADENAS : [])
             .map((c) => `<option value="${c}" ${u.cadena === c ? 'selected' : ''}>${c}</option>`)
@@ -508,7 +508,7 @@ function tarjetaUsuario(u) {
       ? `
       <div class="order-meta" style="margin-top:6px;">
         IBP asignado:
-        <select class="form-field" style="display:inline-block; width:auto; margin-left:4px;" data-campo-ibp-usuario="${u.id}">
+        <select class="form-field inline-select-wide" data-campo-ibp-usuario="${u.id}">
           <option value="">(sin asignar)</option>
           ${opcionesUsuariosPorRol('ibp')
             .map((ibp) => `<option value="${ibp.id}" ${u.ibp_asignado_id === ibp.id ? 'selected' : ''}>${ibp.nombre || ibp.email}</option>`)
@@ -524,7 +524,7 @@ function tarjetaUsuario(u) {
       ? `
       <div class="order-meta" style="margin-top:6px;">
         Supervisor (${u.role === 'ibp' ? 'MSL' : 'ZSL'}):
-        <select class="form-field" style="display:inline-block; width:auto; margin-left:4px;" data-campo-supervisor-usuario="${u.id}">
+        <select class="form-field inline-select-wide" data-campo-supervisor-usuario="${u.id}">
           <option value="">(sin asignar)</option>
           ${opcionesUsuariosPorRol(u.role === 'ibp' ? 'msl' : 'zsl')
             .map((sup) => `<option value="${sup.id}" ${u.supervisor_id === sup.id ? 'selected' : ''}>${sup.nombre || sup.email}</option>`)
@@ -966,7 +966,7 @@ async function cargarProductosAdmin() {
   }
   const { data, error } = await productsSupabaseClient
     .from('products')
-    .select('upc, producto, precio, unidades_caja, unidades_pallet, marca, activo, foto, cadenas_permitidas, es_nuevo, categoria')
+    .select('upc, producto, precio, unidades_caja, unidades_pallet, marca, activo, foto, cadenas_permitidas, es_nuevo, categoria, palabras_clave')
     .order('producto');
   if (error) {
     console.error('Error cargando productos:', error);
@@ -1211,6 +1211,9 @@ function tarjetaProductoAdmin(p) {
           <label>Categoría<br />
             <select class="form-field" data-campo-categoria="${p.upc}">${opcionesCategoriaProducto}</select>
           </label>
+          <label style="flex:1 1 220px;">Palabras clave (búsqueda)<br />
+            <input type="text" class="form-field" data-campo-palabras-clave="${p.upc}" placeholder="ej. pan de molde, sandwich" value="${(Array.isArray(p.palabras_clave) ? p.palabras_clave : []).join(', ').replace(/"/g, '&quot;')}" />
+          </label>
           <label class="toggle-activo">
             <input type="checkbox" data-campo-activo="${p.upc}" ${inactivo ? '' : 'checked'} />
             <span class="switch"></span>
@@ -1250,6 +1253,7 @@ async function guardarProductoAdminClick(upc) {
   const inputActivo = document.querySelector(`[data-campo-activo="${upc}"]`);
   const inputNuevo = document.querySelector(`[data-campo-nuevo="${upc}"]`);
   const inputCategoria = document.querySelector(`[data-campo-categoria="${upc}"]`);
+  const inputPalabrasClave = document.querySelector(`[data-campo-palabras-clave="${upc}"]`);
   const inputsCadena = document.querySelectorAll(`[data-campo-cadena="${upc}"]`);
   const msgEl = document.querySelector(`[data-msg-producto="${upc}"]`);
 
@@ -1264,6 +1268,15 @@ async function guardarProductoAdminClick(upc) {
   if (inputCategoria) {
     const categoriaActual = p ? p.categoria || 'Otros productos Bimbo' : 'Otros productos Bimbo';
     if (inputCategoria.value !== categoriaActual) cambios.categoria = inputCategoria.value;
+  }
+  if (inputPalabrasClave) {
+    const nuevasPalabras = inputPalabrasClave.value
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    const actuales = p && Array.isArray(p.palabras_clave) ? p.palabras_clave : [];
+    const cambiaron = nuevasPalabras.length !== actuales.length || nuevasPalabras.some((w) => !actuales.includes(w));
+    if (cambiaron) cambios.palabras_clave = nuevasPalabras;
   }
   if (inputActivo) {
     const activoActual = p ? p.activo !== false : true;
@@ -1529,19 +1542,28 @@ async function marcarSolicitudAtendida(id) {
 // para esto); el último acceso viene de `profiles.ultimo_login`.
 // ============================================================
 async function cargarActividadAdmin() {
-  const [eventosRes, perfilesRes] = await Promise.all([
+  const [eventosRes, perfilesRes, favoritosRes] = await Promise.all([
     supabaseClient.from('eventos_actividad').select('*').order('created_at', { ascending: false }).limit(3000),
     supabaseClient
       .from('profiles')
       .select('id, nombre, tienda_nombre, email, role, ultimo_login')
       .order('ultimo_login', { ascending: false, nullsFirst: false }),
+    supabaseClient.from('favoritos').select('product_upc, product_nombre'),
   ]);
 
   if (eventosRes.error) {
     console.error('Error cargando eventos de actividad:', eventosRes.error);
   } else {
     renderTopActividad('actividadBusquedasWrap', eventosRes.data || [], 'busqueda');
+    renderTopActividad('actividadSinResultadosWrap', eventosRes.data || [], 'busqueda_sin_resultado');
     renderTopActividad('actividadVistosWrap', eventosRes.data || [], 'vista_producto');
+    renderTopActividad('actividadPreciosWrap', eventosRes.data || [], 'ver_precio');
+  }
+
+  if (favoritosRes.error) {
+    console.error('Error cargando favoritos:', favoritosRes.error);
+  } else {
+    renderTopFavoritos(favoritosRes.data || []);
   }
 
   if (perfilesRes.error) {
@@ -1549,6 +1571,36 @@ async function cargarActividadAdmin() {
   } else {
     renderUltimoAcceso(perfilesRes.data || []);
   }
+}
+
+function renderTopFavoritos(favoritos) {
+  const wrap = document.getElementById('actividadFavoritosWrap');
+  if (!wrap) return;
+
+  const conteos = {};
+  favoritos.forEach((f) => {
+    const clave = f.product_nombre || f.product_upc || '(sin nombre)';
+    conteos[clave] = (conteos[clave] || 0) + 1;
+  });
+
+  const top = Object.entries(conteos)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20);
+
+  if (top.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">Todavía no hay datos.</p>';
+    return;
+  }
+
+  wrap.innerHTML = top
+    .map(
+      ([valor, conteo], i) => `
+      <div class="order-row-compact">
+        <span style="flex:1;">${i + 1}. ${valor}</span>
+        <span class="order-badge aprobado">❤️ ${conteo}×</span>
+      </div>`
+    )
+    .join('');
 }
 
 function renderTopActividad(wrapId, eventos, tipo) {

@@ -274,6 +274,7 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   gap: 4px;
   flex: 1;
 }
+.card-category-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .card-category {
   font-size: 0.62rem;
   text-transform: uppercase;
@@ -281,6 +282,17 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   color: var(--ink-soft);
   font-weight: 700;
 }
+.card-heart-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px;
+  flex: 0 0 auto;
+  transition: transform 0.12s ease;
+}
+.card-heart-btn:hover { transform: scale(1.15); }
 .card-name {
   font-weight: 700;
   cursor: pointer;
@@ -311,6 +323,26 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   font-weight: 600;
   margin-top: 3px;
 }
+/* Precio oculto en la tarjeta hasta que el cliente lo toca — al tocarlo
+   se revela igual que si hubiera entrado al detalle, y de paso queda
+   registrado como señal de interés (ver 'ver_precio' en Actividad admin). */
+.card-price-oculto {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px dashed var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.card-price-oculto:hover { background: #fff; border-color: var(--ink-soft); }
+.card-price-oculto-icon { font-size: 0.8rem; }
 .card-add {
   border: none;
   background: var(--surface);
@@ -452,6 +484,17 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 }
 .detail-hot-tag { margin-left: 8px; font-size: 0.68rem; font-weight: 800; color: var(--bimbo-red); }
 .detail-lock-tag { margin-left: 8px; font-size: 0.68rem; font-weight: 800; color: var(--bimbo-navy); }
+.detail-heart-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  margin-left: 8px;
+  vertical-align: middle;
+  transition: transform 0.12s ease;
+}
+.detail-heart-btn:hover { transform: scale(1.15); }
 .detail-cadenas { margin-top: 16px; }
 .detail-cadenas-label { display: block; margin-bottom: 6px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 700; }
 .detail-cadenas-list { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -922,9 +965,28 @@ select.form-field {
   gap: 10px;
   margin-bottom: 10px;
 }
-.order-cliente { font-weight: 800; font-size: 1rem; }
-.order-meta { color: var(--ink-soft); font-size: 0.8rem; margin-top: 2px; }
+.order-cliente { font-weight: 800; font-size: 1rem; overflow-wrap: break-word; }
+.order-meta { color: var(--ink-soft); font-size: 0.8rem; margin-top: 2px; overflow-wrap: break-word; }
 .order-total { font-weight: 800; font-size: 1.1rem; white-space: nowrap; }
+.order-head > div { min-width: 0; flex: 1; }
+
+/* Selects inline dentro de una tarjeta (ej. Cadena/IBP asignado/Supervisor
+   en Usuarios) — antes usaban width:auto sin tope, así que un nombre u
+   opción larga (correo, etc.) podía forzar scroll horizontal en todo el
+   panel. Con max-width + elipsis, el select nunca empuja el layout. */
+.inline-select-wide {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  margin-left: 4px;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (min-width: 480px) {
+  .inline-select-wide { max-width: 220px; }
+}
 
 .order-badge {
   display: inline-block;
@@ -1046,6 +1108,7 @@ select.form-field {
 }
 .prod-admin-fields label { font-size: 12px; color: var(--ink-soft); }
 .prod-admin-fields input { width: 90px; }
+.prod-admin-fields input[data-campo-palabras-clave] { width: 220px; max-width: 100%; }
 
 .toggle-activo {
   display: inline-flex;
