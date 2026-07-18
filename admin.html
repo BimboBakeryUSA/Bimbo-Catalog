@@ -128,7 +128,9 @@
 
       <select class="form-field" id="nuevoUsuarioTipo">
         <option value="cliente">Cliente (hace pedidos)</option>
-        <option value="corporativo">Corporativo (vendedor, MSL, ZSL...)</option>
+        <option value="ibp">IBP (solo cataloga, sin permisos)</option>
+        <option value="msl">MSL (gestiona sus IBP y clientes)</option>
+        <option value="zsl">ZSL (gestiona sus MSL)</option>
       </select>
       <input class="form-field" id="nuevoUsuarioNombre" placeholder="Nombre" />
       <input class="form-field" id="nuevoUsuarioTelefono" placeholder="Teléfono" />
@@ -147,13 +149,25 @@
         <select class="form-field" id="nuevoUsuarioCadena">
           <option value="">Cadena (sin asignar — ve todo)</option>
         </select>
+        <select class="form-field" id="nuevoUsuarioIbpAsignado">
+          <option value="">IBP asignado (opcional)</option>
+        </select>
+      </div>
+
+      <div id="nuevoUsuarioSupervisorField" class="hidden">
+        <select class="form-field" id="nuevoUsuarioSupervisor">
+          <option value="">Supervisor</option>
+        </select>
       </div>
 
       <select class="form-field" id="nuevoUsuarioAcceso">
         <option value="password">Yo le pongo la contraseña</option>
         <option value="invitar">Enviarle invitación por correo</option>
       </select>
-      <input class="form-field" id="nuevoUsuarioPassword" type="text" placeholder="Contraseña (mínimo 6 caracteres)" />
+      <div class="form-row">
+        <input class="form-field" id="nuevoUsuarioPassword" type="text" placeholder="Contraseña (mínimo 6 caracteres)" style="flex:1;" />
+        <button type="button" class="btn-secondary" id="nuevoUsuarioGenerarPassword" style="flex:0 0 auto;">🎲 Generar otra</button>
+      </div>
 
       <p id="crearUsuarioMsg" class="hint-text" style="margin-top:8px;"></p>
       <button class="btn-primary" id="crearUsuarioBtn">Crear usuario</button>
@@ -172,7 +186,10 @@
         <option value="password">Ponerle contraseña nueva yo mismo</option>
         <option value="invitar">Reenviar invitación por correo</option>
       </select>
-      <input class="form-field" id="resetearAccesoPassword" type="text" placeholder="Contraseña nueva (mínimo 6 caracteres)" />
+      <div class="form-row">
+        <input class="form-field" id="resetearAccesoPassword" type="text" placeholder="Contraseña nueva (mínimo 6 caracteres)" style="flex:1;" />
+        <button type="button" class="btn-secondary" id="resetearAccesoGenerarPassword" style="flex:0 0 auto;">🎲 Generar otra</button>
+      </div>
 
       <p id="resetearAccesoMsg" class="hint-text" style="margin-top:8px;"></p>
       <button class="btn-primary" id="resetearAccesoBtn">Confirmar</button>
@@ -183,6 +200,6 @@
   <script src="i18n.js?v=3"></script>
   <script src="config.js?v=13"></script>
   <script src="profile-menu.js?v=15"></script>
-  <script src="admin.js?v=19"></script>
+  <script src="admin.js?v=22"></script>
 </body>
 </html>

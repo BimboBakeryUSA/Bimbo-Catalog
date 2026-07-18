@@ -362,6 +362,20 @@ function renderUsuarios() {
       cambiarCadenaUsuario(sel.dataset.campoCadenaUsuario, sel.value);
     });
   });
+  wrap.querySelectorAll('[data-campo-ibp-usuario]').forEach((sel) => {
+    sel.addEventListener('click', (e) => e.stopPropagation());
+    sel.addEventListener('change', (e) => {
+      e.stopPropagation();
+      cambiarIbpAsignado(sel.dataset.campoIbpUsuario, sel.value);
+    });
+  });
+  wrap.querySelectorAll('[data-campo-supervisor-usuario]').forEach((sel) => {
+    sel.addEventListener('click', (e) => e.stopPropagation());
+    sel.addEventListener('change', (e) => {
+      e.stopPropagation();
+      cambiarSupervisorUsuario(sel.dataset.campoSupervisorUsuario, sel.value);
+    });
+  });
 }
 
 async function cambiarCadenaUsuario(id, cadena) {
@@ -372,6 +386,32 @@ async function cambiarCadenaUsuario(id, cadena) {
   }
   const u = usuarios.find((x) => x.id === id);
   if (u) u.cadena = cadena || null;
+}
+
+async function cambiarIbpAsignado(id, ibpId) {
+  const { error } = await supabaseClient.from('profiles').update({ ibp_asignado_id: ibpId || null }).eq('id', id);
+  if (error) {
+    console.error('Error actualizando IBP asignado:', error);
+    return;
+  }
+  const u = usuarios.find((x) => x.id === id);
+  if (u) u.ibp_asignado_id = ibpId || null;
+}
+
+async function cambiarSupervisorUsuario(id, supervisorId) {
+  const { error } = await supabaseClient.from('profiles').update({ supervisor_id: supervisorId || null }).eq('id', id);
+  if (error) {
+    console.error('Error actualizando supervisor:', error);
+    return;
+  }
+  const u = usuarios.find((x) => x.id === id);
+  if (u) u.supervisor_id = supervisorId || null;
+}
+
+// Usuarios aprobados de un rol dado (para los selectores de IBP
+// asignado / Supervisor dentro de cada tarjeta).
+function opcionesUsuariosPorRol(rol) {
+  return usuarios.filter((u) => u.role === rol && u.estado_cuenta === 'aprobado');
 }
 
 function tarjetaUsuario(u) {
@@ -408,9 +448,8 @@ function tarjetaUsuario(u) {
     }
   }
 
-  // La cadena solo aplica a clientes (deciden qué pueden pedir) — un
-  // corporativo (vendedor/MSL/ZSL) no hace pedidos, así que no le
-  // corresponde este selector.
+  // La cadena solo aplica a clientes (deciden qué pueden pedir) — IBP,
+  // MSL y ZSL no hacen pedidos, así que no les corresponde este selector.
   const cadenaHtml =
     u.role === 'cliente'
       ? `
@@ -425,7 +464,43 @@ function tarjetaUsuario(u) {
       </div>`
       : '';
 
-  const etiquetaBadge = u.role === 'admin' ? 'admin' : u.role === 'corporativo' ? `corporativo · ${u.estado_cuenta}` : u.estado_cuenta;
+  // IBP asignado — solo para clientes: qué IBP los atiende/dio de alta.
+  const ibpAsignadoHtml =
+    u.role === 'cliente'
+      ? `
+      <div class="order-meta" style="margin-top:6px;">
+        IBP asignado:
+        <select class="form-field" style="display:inline-block; width:auto; margin-left:4px;" data-campo-ibp-usuario="${u.id}">
+          <option value="">(sin asignar)</option>
+          ${opcionesUsuariosPorRol('ibp')
+            .map((ibp) => `<option value="${ibp.id}" ${u.ibp_asignado_id === ibp.id ? 'selected' : ''}>${ibp.nombre || ibp.email}</option>`)
+            .join('')}
+        </select>
+      </div>`
+      : '';
+
+  // Supervisor — para IBP es su MSL, para MSL es su ZSL. Un ZSL está en
+  // la punta de la jerarquía y no tiene supervisor.
+  const supervisorHtml =
+    u.role === 'ibp' || u.role === 'msl'
+      ? `
+      <div class="order-meta" style="margin-top:6px;">
+        Supervisor (${u.role === 'ibp' ? 'MSL' : 'ZSL'}):
+        <select class="form-field" style="display:inline-block; width:auto; margin-left:4px;" data-campo-supervisor-usuario="${u.id}">
+          <option value="">(sin asignar)</option>
+          ${opcionesUsuariosPorRol(u.role === 'ibp' ? 'msl' : 'zsl')
+            .map((sup) => `<option value="${sup.id}" ${u.supervisor_id === sup.id ? 'selected' : ''}>${sup.nombre || sup.email}</option>`)
+            .join('')}
+        </select>
+      </div>`
+      : '';
+
+  const ETIQUETAS_ROL = { admin: 'admin', ibp: 'IBP', msl: 'MSL', zsl: 'ZSL' };
+  const etiquetaBadge = ETIQUETAS_ROL[u.role]
+    ? u.role === 'admin'
+      ? 'admin'
+      : `${ETIQUETAS_ROL[u.role]} · ${u.estado_cuenta}`
+    : u.estado_cuenta;
 
   return `
     <div class="order-card ${u.estado_cuenta === 'pendiente' ? 'is-nuevo' : ''}">
@@ -438,6 +513,8 @@ function tarjetaUsuario(u) {
           <div class="order-meta">Registrado: ${fecha}</div>
           <span class="order-badge ${u.role === 'admin' ? 'admin' : u.estado_cuenta}">${etiquetaBadge}</span>
           ${cadenaHtml}
+          ${ibpAsignadoHtml}
+          ${supervisorHtml}
         </div>
       </div>
       <div class="order-actions">${acciones.join('')}</div>
@@ -479,12 +556,32 @@ function suscribirseAUsuarios() {
 }
 
 // ============================================================
-// CREAR USUARIO (cliente o corporativo) directo desde el panel —
+// CONTRASEÑA AUTOMÁTICA — formato acordado: BimboUSA.(nombre)(4 dígitos)!
+// Se usa tanto al crear un usuario nuevo como al resetear el acceso de
+// uno existente. Toma el primer nombre, le quita acentos/símbolos, y le
+// pega 4 dígitos al azar para que no sea adivinable solo con saber el
+// nombre del cliente.
+// ============================================================
+function generarPasswordAutomatica(nombre) {
+  const primerNombre = (nombre || '').trim().split(/\s+/)[0] || 'Cliente';
+  // normalize('NFD') separa acentos de su letra (á -> a + acento); el
+  // replace de abajo se queda solo con a-zA-Z0-9, así que de paso también
+  // quita esos acentos ya separados, sin necesitar un rango unicode aparte.
+  const limpio = primerNombre.normalize('NFD').replace(/[^a-zA-Z0-9]/g, '');
+  const nombreFormateado = limpio ? limpio.charAt(0).toUpperCase() + limpio.slice(1).toLowerCase() : 'Cliente';
+  const digitos = String(Math.floor(1000 + Math.random() * 9000));
+  return `BimboUSA.${nombreFormateado}${digitos}!`;
+}
+
+// ============================================================
+// CREAR USUARIO (cliente, IBP, MSL o ZSL) directo desde el panel —
 // vía Edge Function admin-create-user (queda aprobado de inmediato,
 // sin pasar por la lista de pendientes). Dos formas de darle acceso:
 // que Supabase le mande invitación por correo, o que el admin le
 // ponga la contraseña aquí mismo y se la comparta directo.
 // ============================================================
+let nuevoUsuarioPasswordManual = false;
+
 function abrirModalCrearUsuario() {
   document.getElementById('nuevoUsuarioTipo').value = 'cliente';
   document.getElementById('nuevoUsuarioNombre').value = '';
@@ -496,8 +593,11 @@ function abrirModalCrearUsuario() {
   document.getElementById('nuevoUsuarioEstado').value = '';
   document.getElementById('nuevoUsuarioZip').value = '';
   document.getElementById('nuevoUsuarioCadena').value = '';
+  document.getElementById('nuevoUsuarioIbpAsignado').innerHTML = '<option value="">IBP asignado (opcional)</option>';
+  document.getElementById('nuevoUsuarioSupervisor').innerHTML = '<option value="">Supervisor</option>';
   document.getElementById('nuevoUsuarioAcceso').value = 'password';
-  document.getElementById('nuevoUsuarioPassword').value = '';
+  nuevoUsuarioPasswordManual = false;
+  actualizarPasswordAutomaticaCrearUsuario();
   const msgEl = document.getElementById('crearUsuarioMsg');
   msgEl.textContent = '';
   msgEl.style.color = '';
@@ -506,13 +606,54 @@ function abrirModalCrearUsuario() {
 }
 
 // Los campos de tienda/dirección/cadena solo aplican a "Cliente" (son
-// para hacer pedidos); el campo de contraseña solo aplica si el admin
-// elige ponerla él mismo en vez de mandar invitación por correo.
+// para hacer pedidos); el selector de Supervisor solo aplica a IBP (su
+// MSL) y MSL (su ZSL) — ZSL está en la punta de la jerarquía y no tiene
+// supervisor; el campo de contraseña solo aplica si el admin elige
+// ponerla él mismo en vez de mandar invitación por correo.
 function actualizarCamposCrearUsuario() {
-  const esCliente = document.getElementById('nuevoUsuarioTipo').value === 'cliente';
+  const tipo = document.getElementById('nuevoUsuarioTipo').value;
+
+  const esCliente = tipo === 'cliente';
   document.getElementById('nuevoUsuarioClienteFields').classList.toggle('hidden', !esCliente);
+  if (esCliente) {
+    poblarSelectorUsuariosPorRol('nuevoUsuarioIbpAsignado', 'ibp', 'IBP asignado (opcional)');
+  }
+
+  const campoSupervisor = document.getElementById('nuevoUsuarioSupervisorField');
+  if (tipo === 'ibp') {
+    campoSupervisor.classList.remove('hidden');
+    poblarSelectorUsuariosPorRol('nuevoUsuarioSupervisor', 'msl', 'Supervisor (MSL) — opcional');
+  } else if (tipo === 'msl') {
+    campoSupervisor.classList.remove('hidden');
+    poblarSelectorUsuariosPorRol('nuevoUsuarioSupervisor', 'zsl', 'Supervisor (ZSL) — opcional');
+  } else {
+    campoSupervisor.classList.add('hidden');
+  }
+
   const esPassword = document.getElementById('nuevoUsuarioAcceso').value === 'password';
-  document.getElementById('nuevoUsuarioPassword').classList.toggle('hidden', !esPassword);
+  document.getElementById('nuevoUsuarioPassword').closest('.form-row').classList.toggle('hidden', !esPassword);
+}
+
+// Llena un <select> con los usuarios aprobados de un rol dado (ej. todos
+// los MSL, para elegir el supervisor de un IBP). Conserva la selección
+// actual si sigue siendo una opción válida tras repoblar.
+function poblarSelectorUsuariosPorRol(selectId, rol, textoDefault) {
+  const selectEl = document.getElementById(selectId);
+  const valorPrevio = selectEl.value;
+  const candidatos = (usuarios || []).filter((u) => u.role === rol && u.estado_cuenta === 'aprobado');
+  selectEl.innerHTML =
+    `<option value="">${textoDefault}</option>` +
+    candidatos.map((u) => `<option value="${u.id}">${u.nombre || u.email}</option>`).join('');
+  if (candidatos.some((u) => u.id === valorPrevio)) selectEl.value = valorPrevio;
+}
+
+// Se regenera sola mientras el admin escribe el nombre — a menos que ya
+// haya editado la contraseña a mano, en cuyo caso se respeta lo que puso.
+function actualizarPasswordAutomaticaCrearUsuario() {
+  if (nuevoUsuarioPasswordManual) return;
+  document.getElementById('nuevoUsuarioPassword').value = generarPasswordAutomatica(
+    document.getElementById('nuevoUsuarioNombre').value
+  );
 }
 
 async function crearUsuarioClick() {
@@ -529,6 +670,8 @@ async function crearUsuarioClick() {
   const estado = document.getElementById('nuevoUsuarioEstado').value.trim();
   const zip = document.getElementById('nuevoUsuarioZip').value.trim();
   const cadena = document.getElementById('nuevoUsuarioCadena').value.trim();
+  const ibpAsignadoId = document.getElementById('nuevoUsuarioIbpAsignado').value;
+  const supervisorId = document.getElementById('nuevoUsuarioSupervisor').value;
   const acceso = document.getElementById('nuevoUsuarioAcceso').value;
   const password = document.getElementById('nuevoUsuarioPassword').value;
 
@@ -579,6 +722,8 @@ async function crearUsuarioClick() {
         estado: tipo === 'cliente' ? estado : '',
         zip: tipo === 'cliente' ? zip : '',
         cadena: tipo === 'cliente' ? cadena : '',
+        ibp_asignado_id: tipo === 'cliente' ? ibpAsignadoId || null : null,
+        supervisor_id: tipo === 'ibp' || tipo === 'msl' ? supervisorId || null : null,
         enviar_invitacion: enviarInvitacion,
         password: enviarInvitacion ? undefined : password,
       },
@@ -629,14 +774,18 @@ async function crearUsuarioClick() {
 // reenvías la invitación por correo.
 // ============================================================
 let resetearAccesoEmailActual = '';
+let resetearAccesoNombreActual = '';
+let resetearAccesoPasswordManual = false;
 
 function abrirModalResetearAcceso(id) {
   const u = usuarios.find((x) => x.id === id);
   if (!u || !u.email) return;
   resetearAccesoEmailActual = u.email;
+  resetearAccesoNombreActual = u.nombre || '';
   document.getElementById('resetearAccesoEmail').textContent = `Cuenta: ${u.email}`;
   document.getElementById('resetearAccesoTipo').value = 'password';
-  document.getElementById('resetearAccesoPassword').value = '';
+  resetearAccesoPasswordManual = false;
+  actualizarPasswordAutomaticaResetearAcceso();
   const msgEl = document.getElementById('resetearAccesoMsg');
   msgEl.textContent = '';
   msgEl.style.color = '';
@@ -646,7 +795,12 @@ function abrirModalResetearAcceso(id) {
 
 function actualizarCamposResetearAcceso() {
   const esPassword = document.getElementById('resetearAccesoTipo').value === 'password';
-  document.getElementById('resetearAccesoPassword').classList.toggle('hidden', !esPassword);
+  document.getElementById('resetearAccesoPassword').closest('.form-row').classList.toggle('hidden', !esPassword);
+}
+
+function actualizarPasswordAutomaticaResetearAcceso() {
+  if (resetearAccesoPasswordManual) return;
+  document.getElementById('resetearAccesoPassword').value = generarPasswordAutomatica(resetearAccesoNombreActual);
 }
 
 async function resetearAccesoClick() {
@@ -1032,9 +1186,24 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('abrirCrearUsuarioBtn').addEventListener('click', abrirModalCrearUsuario);
   document.getElementById('nuevoUsuarioTipo').addEventListener('change', actualizarCamposCrearUsuario);
   document.getElementById('nuevoUsuarioAcceso').addEventListener('change', actualizarCamposCrearUsuario);
+  document.getElementById('nuevoUsuarioNombre').addEventListener('input', actualizarPasswordAutomaticaCrearUsuario);
+  document.getElementById('nuevoUsuarioPassword').addEventListener('input', () => {
+    nuevoUsuarioPasswordManual = true;
+  });
+  document.getElementById('nuevoUsuarioGenerarPassword').addEventListener('click', () => {
+    nuevoUsuarioPasswordManual = false;
+    actualizarPasswordAutomaticaCrearUsuario();
+  });
   document.getElementById('crearUsuarioBtn').addEventListener('click', crearUsuarioClick);
 
   document.getElementById('resetearAccesoTipo').addEventListener('change', actualizarCamposResetearAcceso);
+  document.getElementById('resetearAccesoPassword').addEventListener('input', () => {
+    resetearAccesoPasswordManual = true;
+  });
+  document.getElementById('resetearAccesoGenerarPassword').addEventListener('click', () => {
+    resetearAccesoPasswordManual = false;
+    actualizarPasswordAutomaticaResetearAcceso();
+  });
   document.getElementById('resetearAccesoBtn').addEventListener('click', resetearAccesoClick);
 
   document.getElementById('productosBusqueda').addEventListener('input', (e) => {
