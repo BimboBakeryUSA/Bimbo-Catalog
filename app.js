@@ -742,6 +742,41 @@ function actualizarBadge() {
   const total = totalItemsCarrito();
   badge.textContent = total;
   badge.classList.toggle('hidden', total === 0);
+  reiniciarTimerRecordatorioCarrito();
+}
+
+// ============================================================
+// RECORDATORIO DE CARRITO — si el cliente deja productos en el carrito y
+// pasa un rato sin hacer nada (sin tocar la pantalla), aparece un aviso
+// discreto abajo mencionando el producto. No es un modal que interrumpa:
+// se puede cerrar, y solo vuelve a aparecer si hay otro rato de
+// inactividad después de eso.
+// ============================================================
+let timerRecordatorioCarrito = null;
+const RECORDATORIO_CARRITO_IDLE_MS = 45000;
+
+function reiniciarTimerRecordatorioCarrito() {
+  clearTimeout(timerRecordatorioCarrito);
+  if (carrito.length === 0) return;
+  timerRecordatorioCarrito = setTimeout(mostrarRecordatorioCarrito, RECORDATORIO_CARRITO_IDLE_MS);
+}
+
+function mostrarRecordatorioCarrito() {
+  if (carrito.length === 0) return;
+  const cartModalEl = document.getElementById('cartModal');
+  if (cartModalEl && !cartModalEl.classList.contains('hidden')) return; // ya está viendo su carrito
+
+  const primerItem = carrito[0];
+  const variante = 1 + Math.floor(Math.random() * 3);
+  const texto = t(`carritoRecordatorio${variante}`, primerItem.nombre);
+
+  document.getElementById('cartReminderText').textContent = texto;
+  document.getElementById('cartReminderBtn').textContent = t('carritoRecordatorioCta');
+  document.getElementById('cartReminderToast').classList.remove('hidden');
+}
+
+function ocultarRecordatorioCarrito() {
+  document.getElementById('cartReminderToast').classList.add('hidden');
 }
 
 // ============================================================
@@ -1638,6 +1673,24 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cartBtn').addEventListener('click', () => {
     renderCartModal();
     abrirModal('cartModal');
+    ocultarRecordatorioCarrito();
+    clearTimeout(timerRecordatorioCarrito);
+  });
+
+  document.getElementById('cartReminderBtn').addEventListener('click', () => {
+    ocultarRecordatorioCarrito();
+    renderCartModal();
+    abrirModal('cartModal');
+  });
+  document.getElementById('cartReminderCloseBtn').addEventListener('click', () => {
+    ocultarRecordatorioCarrito();
+    reiniciarTimerRecordatorioCarrito();
+  });
+
+  // Cualquier interacción reinicia el reloj de inactividad — el aviso
+  // solo debe aparecer tras un rato REAL sin uso, no apenas se cierra.
+  ['click', 'keydown', 'scroll', 'touchstart'].forEach((evento) => {
+    document.addEventListener(evento, () => reiniciarTimerRecordatorioCarrito(), { passive: true });
   });
 
   document.querySelectorAll('[data-close]').forEach((btn) => {

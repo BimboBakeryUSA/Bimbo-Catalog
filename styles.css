@@ -373,6 +373,53 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 }
 .novedad-tile.no-disponible { opacity: 0.5; filter: grayscale(55%); }
 
+/* Recordatorio de carrito abandonado — aviso flotante discreto, no un
+   modal que interrumpa; se puede cerrar y no vuelve a aparecer hasta el
+   siguiente rato de inactividad con productos en el carrito. */
+.cart-reminder-toast {
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 35;
+  background: var(--ink);
+  color: #fff;
+  border-radius: var(--radius-md);
+  padding: 14px 14px 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-md);
+  animation: slideUp 0.25s ease;
+}
+.cart-reminder-toast span#cartReminderText { flex: 1; font-size: 0.86rem; font-weight: 600; line-height: 1.35; }
+.cart-reminder-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.cart-reminder-btn {
+  border: none;
+  background: var(--bimbo-red);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 9px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cart-reminder-btn:hover { background: var(--bimbo-red-dark); }
+.cart-reminder-close {
+  border: none;
+  background: none;
+  color: rgba(255,255,255,0.6);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 4px;
+}
+.cart-reminder-close:hover { color: #fff; }
+@media (min-width: 640px) {
+  .cart-reminder-toast { left: auto; right: 20px; bottom: 20px; max-width: 360px; }
+}
+
 /* Modal */
 .modal {
   position: fixed;
@@ -1058,6 +1105,7 @@ select.form-field {
 .order-row-compact.is-nuevo { border-color: var(--bimbo-red); box-shadow: 0 0 0 3px rgba(227,6,19,0.06); }
 .order-row-compact .compact-nombre {
   flex: 1;
+  min-width: 0;
   font-weight: 600;
   font-size: 0.85rem;
   color: var(--ink);
@@ -1065,17 +1113,31 @@ select.form-field {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Bug real del "ancho distinto" en Usuarios: estos dos spans (teléfono,
+   estado+zip) tenían white-space:nowrap SIN min-width:0 — un flex item
+   con texto de una sola línea no se encoge por debajo de su ancho de
+   contenido a menos que se le diga explícitamente, así que un teléfono +
+   "ES 12345" empujaban la fila entera (y con ella, la página) más ancha
+   que el viewport. Con min-width:0 + ellipsis, el texto se recorta en
+   vez de forzar overflow horizontal. */
 .order-row-compact .compact-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 130px;
   font-size: 0.78rem;
   color: var(--ink-soft);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .order-row-compact .compact-total {
+  flex: 0 0 auto;
   font-weight: 700;
   font-size: 0.85rem;
   color: var(--ink);
   white-space: nowrap;
 }
+.order-row-compact .order-badge { flex: 0 0 auto; margin-top: 0; }
 
 /* Tarjeta de producto en el admin (Productos): foto + edición inline */
 .prod-admin-card {
