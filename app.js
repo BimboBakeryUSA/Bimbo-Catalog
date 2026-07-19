@@ -75,6 +75,29 @@ function registrarEventoActividad(tipo, valor) {
     .then(() => {});
 }
 
+// Duración de sesión: se guarda UNA fila por visita, con los minutos
+// activos, en cuanto la pestaña pasa a segundo plano (o se cierra) — es
+// más confiable que esperar el cierre exacto de la página. Cada fila
+// también sirve para medir frecuencia (cuántas visitas hizo cada quien).
+let inicioSesion = null;
+let duracionSesionRegistrada = false;
+function registrarDuracionSesion() {
+  if (duracionSesionRegistrada || !inicioSesion) return;
+  const minutos = Math.round((Date.now() - inicioSesion) / 60000);
+  if (minutos < 1) return;
+  duracionSesionRegistrada = true;
+  registrarEventoActividad('sesion_duracion', String(minutos));
+}
+
+// Dispositivo (móvil/escritorio) e idioma de navegación — un solo evento
+// por sesión, le sirve al admin para priorizar dónde invertir esfuerzo
+// (ej. si vale la pena terminar de traducir el panel).
+function registrarDispositivoEIdioma() {
+  const esMovil = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  registrarEventoActividad('dispositivo', esMovil ? 'Móvil' : 'Escritorio');
+  registrarEventoActividad('idioma_uso', obtenerIdioma() === 'en' ? 'Inglés' : 'Español');
+}
+
 // Se registra una búsqueda solo cuando el cliente DEJA de escribir
 // (después de una pausa) — así no se guarda una fila por cada tecla.
 // De paso, si esa búsqueda no encontró NADA, se registra aparte como
@@ -122,6 +145,11 @@ async function mostrarApp() {
   renderChips();
   renderCatalogo();
   actualizarBadge();
+
+  if (!inicioSesion) {
+    inicioSesion = Date.now();
+    registrarDispositivoEIdioma();
+  }
   initProfileMenu({
     linkPedidos: tienePanelAdmin,
     linkMisPedidos: !tienePanelAdmin,
@@ -706,6 +734,7 @@ function agregarAlCarrito(slug, cantidad = 1) {
   }
   guardarCarrito(carrito);
   actualizarBadge();
+  registrarEventoActividad('agregado_carrito', producto.nombre);
 }
 
 function cambiarCantidad(slug, cantidad) {
@@ -839,6 +868,7 @@ function renderChips() {
       categoriaActiva = btn.dataset.cat;
       renderChips();
       renderCatalogo();
+      registrarEventoActividad('categoria_vista', categoriaActiva);
     });
   });
 }
@@ -1507,6 +1537,7 @@ async function enviarPedido() {
         cliente_notas: notas || null,
         items: carrito,
         total: totalCarrito(),
+        idioma: obtenerIdioma(),
       });
     } catch (err) {
       console.error('Error guardando pedido en Supabase:', err);
@@ -1701,5 +1732,9 @@ document.addEventListener('DOMContentLoaded', () => {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) modal.classList.add('hidden');
     });
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') registrarDuracionSesion();
   });
 });

@@ -150,6 +150,7 @@ async function cargarPedidos() {
   }
   pedidos = data || [];
   renderPedidos();
+  renderPedidosPorIdioma();
 }
 
 function renderPedidos() {
@@ -266,6 +267,7 @@ function suscribirseATiempoReal() {
       (payload) => {
         pedidos.unshift(payload.new);
         renderPedidos();
+        renderPedidosPorIdioma();
         notificarPedidoNuevo();
       }
     )
@@ -1554,10 +1556,16 @@ async function cargarActividadAdmin() {
   if (eventosRes.error) {
     console.error('Error cargando eventos de actividad:', eventosRes.error);
   } else {
-    renderTopActividad('actividadBusquedasWrap', eventosRes.data || [], 'busqueda');
-    renderTopActividad('actividadSinResultadosWrap', eventosRes.data || [], 'busqueda_sin_resultado');
-    renderTopActividad('actividadVistosWrap', eventosRes.data || [], 'vista_producto');
-    renderTopActividad('actividadPreciosWrap', eventosRes.data || [], 'ver_precio');
+    const eventos = eventosRes.data || [];
+    renderTopActividad('actividadBusquedasWrap', eventos, 'busqueda');
+    renderTopActividad('actividadSinResultadosWrap', eventos, 'busqueda_sin_resultado');
+    renderTopActividad('actividadVistosWrap', eventos, 'vista_producto');
+    renderTopActividad('actividadPreciosWrap', eventos, 'ver_precio');
+    renderTopActividad('actividadCategoriasWrap', eventos, 'categoria_vista');
+    renderTopActividad('actividadDispositivoWrap', eventos, 'dispositivo');
+    renderTopActividad('actividadIdiomaWrap', eventos, 'idioma_uso');
+    renderInteresSinConversion(eventos);
+    renderDuracionSesionAdmin(eventos, perfilesRes.data || []);
   }
 
   if (favoritosRes.error) {
@@ -1571,6 +1579,116 @@ async function cargarActividadAdmin() {
   } else {
     renderUltimoAcceso(perfilesRes.data || []);
   }
+}
+
+// Productos con muchas vistas pero pocos (o ningún) "agregar al carrito"
+// — señal de que algo en precio/foto/descripción no está convenciendo.
+// Solo se muestran productos con al menos 3 vistas, para no llenar la
+// lista de ruido de un producto que un solo cliente abrió una vez.
+function renderInteresSinConversion(eventos) {
+  const wrap = document.getElementById('actividadSinConversionWrap');
+  if (!wrap) return;
+
+  const vistas = {};
+  const agregados = {};
+  eventos.forEach((e) => {
+    if (e.tipo === 'vista_producto' && e.valor) vistas[e.valor] = (vistas[e.valor] || 0) + 1;
+    if (e.tipo === 'agregado_carrito' && e.valor) agregados[e.valor] = (agregados[e.valor] || 0) + 1;
+  });
+
+  const filas = Object.entries(vistas)
+    .filter(([, count]) => count >= 3)
+    .map(([nombre, vistasCount]) => ({ nombre, vistasCount, agregadosCount: agregados[nombre] || 0 }))
+    .sort((a, b) => b.vistasCount - a.vistasCount - (b.agregadosCount - a.agregadosCount))
+    .slice(0, 20);
+
+  if (filas.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">Todavía no hay suficientes datos.</p>';
+    return;
+  }
+
+  wrap.innerHTML = filas
+    .map(
+      (f, i) => `
+      <div class="order-row-compact">
+        <span style="flex:1;">${i + 1}. ${f.nombre}</span>
+        <span class="hint-text" style="margin:0;">👁 ${f.vistasCount}× · 🛒 ${f.agregadosCount}×</span>
+      </div>`
+    )
+    .join('');
+}
+
+// Duración y frecuencia de sesión — cada fila 'sesion_duracion' es UNA
+// visita, con los minutos activos como valor. Se agrupa por usuario:
+// cantidad de visitas (frecuencia) + minutos totales (duración).
+function renderDuracionSesionAdmin(eventos, perfiles) {
+  const wrap = document.getElementById('actividadSesionWrap');
+  if (!wrap) return;
+
+  const perfilesPorId = {};
+  perfiles.forEach((p) => (perfilesPorId[p.id] = p));
+
+  const porUsuario = {};
+  eventos
+    .filter((e) => e.tipo === 'sesion_duracion')
+    .forEach((e) => {
+      if (!e.user_id) return;
+      if (!porUsuario[e.user_id]) porUsuario[e.user_id] = { visitas: 0, minutos: 0 };
+      porUsuario[e.user_id].visitas += 1;
+      porUsuario[e.user_id].minutos += Number(e.valor) || 0;
+    });
+
+  const filas = Object.entries(porUsuario)
+    .map(([userId, datos]) => {
+      const p = perfilesPorId[userId];
+      return { nombre: p ? p.nombre || p.tienda_nombre || p.email : '(usuario eliminado)', ...datos };
+    })
+    .sort((a, b) => b.minutos - a.minutos)
+    .slice(0, 20);
+
+  if (filas.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">Todavía no hay datos.</p>';
+    return;
+  }
+
+  wrap.innerHTML = filas
+    .map(
+      (f, i) => `
+      <div class="order-row-compact">
+        <span style="flex:1;">${i + 1}. ${f.nombre}</span>
+        <span class="hint-text" style="margin:0;">${f.visitas} visita(s) · ${f.minutos} min activos</span>
+      </div>`
+    )
+    .join('');
+}
+
+// Pedidos por idioma — usa el arreglo global `pedidos` (ya cargado por
+// cargarPedidos()), no necesita otra consulta.
+function renderPedidosPorIdioma() {
+  const wrap = document.getElementById('actividadPedidosIdiomaWrap');
+  if (!wrap) return;
+
+  const conteos = {};
+  pedidos.forEach((p) => {
+    const clave = p.idioma === 'en' ? 'Inglés' : p.idioma === 'es' ? 'Español' : '(sin registrar)';
+    conteos[clave] = (conteos[clave] || 0) + 1;
+  });
+
+  const filas = Object.entries(conteos).sort((a, b) => b[1] - a[1]);
+  if (filas.length === 0) {
+    wrap.innerHTML = '<p class="empty-state">Todavía no hay pedidos.</p>';
+    return;
+  }
+
+  wrap.innerHTML = filas
+    .map(
+      ([valor, conteo]) => `
+      <div class="order-row-compact">
+        <span style="flex:1;">${valor}</span>
+        <span class="order-badge aprobado">${conteo}×</span>
+      </div>`
+    )
+    .join('');
 }
 
 function renderTopFavoritos(favoritos) {
