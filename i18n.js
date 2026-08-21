@@ -142,6 +142,9 @@ const I18N = {
     muebleSolicitarError: 'No se pudo enviar tu solicitud. Intenta de nuevo.',
     chipFavoritos: 'Mis favoritos',
     tocaVerPrecio: 'Toca para ver precio',
+    precioSoloConCuenta: 'Inicia sesión para ver precios',
+    checkoutRequiereCuentaMsg:
+      'Para ver el total y completar tu pedido, inicia sesión o crea una cuenta. Tus datos quedan guardados para tus próximos pedidos.',
     btnCompartir: '🔗 Compartir',
     enlaceCopiado: '✓ Enlace copiado. Pégalo donde quieras compartirlo.',
     adminAccesoTitulo: 'Acceso admin',
@@ -308,6 +311,9 @@ const I18N = {
     muebleSolicitarError: "Couldn't send your request. Please try again.",
     chipFavoritos: 'My favorites',
     tocaVerPrecio: 'Tap to see price',
+    precioSoloConCuenta: 'Sign in to see prices',
+    checkoutRequiereCuentaMsg:
+      "To see the total and complete your order, sign in or create an account. Your info stays saved for your next orders.",
     btnCompartir: '🔗 Share',
     enlaceCopiado: '✓ Link copied. Paste it wherever you want to share it.',
     adminAccesoTitulo: 'Admin access',

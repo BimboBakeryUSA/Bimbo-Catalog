@@ -85,6 +85,25 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 }
 .cart-btn:hover { background: var(--bimbo-red); transform: translateY(-1px); }
 .cart-btn:active { transform: translateY(0); }
+
+/* Botón "Iniciar sesión" en el topbar — solo visible para un visitante
+   sin sesión (ver appShell/topbarLoginBtn en app.js). */
+.login-btn-topbar {
+  display: inline-flex;
+  align-items: center;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.login-btn-topbar:hover { background: var(--surface); border-color: var(--ink-soft); }
+
 .cart-badge {
   position: absolute;
   top: -6px;
@@ -847,6 +866,24 @@ select.form-field {
   font-weight: 800;
   margin: 6px 0 20px;
 }
+
+/* Volver al catálogo sin iniciar sesión — solo tiene sentido ahora que el
+   catálogo se puede explorar como invitado (ver authView en index.html). */
+.auth-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 14px;
+}
+.auth-back-link:hover { color: var(--ink); }
 
 .auth-card { max-width: 400px; }
 .auth-tabs {

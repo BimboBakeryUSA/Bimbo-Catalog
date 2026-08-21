@@ -2,13 +2,20 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v24 — Dashboard visible para MSL/ZSL en el catálogo';
+const VERSION = 'v25 — Catálogo visible sin cuenta (precios y pedido requieren login)';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
 
 // ============================================================
-// AUTENTICACIÓN — el catálogo requiere cuenta (cliente o admin)
+// AUTENTICACIÓN — el catálogo en sí (explorar productos) NO requiere
+// cuenta. Un visitante sin sesión (usuarioActual/perfilActual en null)
+// ve el mismo appShell que un cliente logueado, pero: (1) no ve precios
+// — ver renderProductCard/abrirDetalleProducto/renderCartModal, que
+// muestran t('precioSoloConCuenta') en su lugar — y (2) al intentar
+// pagar en el carrito, en vez del formulario de checkout se le pide
+// iniciar sesión o crear cuenta. Cuenta (cliente o admin) sigue siendo
+// necesaria para eso y para que el pedido quede asociado a un perfil.
 // ============================================================
 let perfilActual = null;
 let usuarioActual = null;
@@ -31,8 +38,9 @@ async function mostrarSegunSesion() {
   if (data.session) {
     await cargarPerfilYEntrar();
   } else {
-    document.getElementById('authView').classList.remove('hidden');
-    document.getElementById('appShell').classList.add('hidden');
+    // Sin sesión: el catálogo se muestra igual, como invitado — mostrarApp()
+    // ya tolera usuarioActual/perfilActual en null (ver comentario arriba).
+    await mostrarApp();
   }
 }
 
@@ -128,7 +136,11 @@ async function mostrarApp() {
   // "Dashboard" en su menú de perfil (apunta a admin.html). IBP y cliente
   // no lo ven porque no tienen panel.
   const tienePanelAdmin = ['admin', 'msl', 'zsl'].includes(perfilActual?.role);
-  if (!esAdmin && perfilActual?.estado_cuenta !== 'aprobado') {
+
+  // El gate de "cuenta pendiente de aprobación" solo aplica a quien SÍ
+  // inició sesión (usuarioActual truthy) — un visitante sin cuenta explora
+  // el catálogo libremente, sin pasar por aquí (ver mostrarSegunSesion()).
+  if (usuarioActual && !esAdmin && perfilActual?.estado_cuenta !== 'aprobado') {
     mostrarPendiente();
     return;
   }
@@ -141,6 +153,9 @@ async function mostrarApp() {
   }
 
   document.getElementById('appShell').classList.remove('hidden');
+  // El botón "Iniciar sesión" del topbar solo tiene sentido sin sesión —
+  // con sesión, ese lugar lo ocupa el ícono de perfil (profileWrap).
+  document.getElementById('topbarLoginBtn').classList.toggle('hidden', !!usuarioActual);
   await Promise.all([cargarProductos(), cargarCategoriasCatalogo(), cargarMuebles(), cargarFavoritos()]);
   renderChips();
   renderCatalogo();
@@ -1156,7 +1171,11 @@ function crearTarjetaProducto(producto) {
   const unidadLabel = producto.ventaPorCaja ? t('unidadCaja', producto.unidadesCaja) : t('unidadPieza');
   const esFavorito = FAVORITOS.has(producto.slug);
   const precioRevelado = PRECIOS_REVELADOS.has(producto.slug);
-  const precioRowHtml = precioRevelado
+  // Sin sesión no hay "toca para ver precio" — el precio ni siquiera se
+  // revela al tocar, solo se invita a iniciar sesión (no es un botón).
+  const precioRowHtml = !usuarioActual
+    ? `<span class="card-price-oculto">${t('precioSoloConCuenta')}</span>`
+    : precioRevelado
     ? `<div style="text-align:right;">
         <span class="card-price">$${producto.precio.toFixed(2)}</span>
         <span class="card-price-unit">${unidadLabel}</span>
@@ -1316,6 +1335,13 @@ function abrirDetalleProducto(slug) {
     ? `<p class="detail-no-disponible-msg">${t('detailNoDisponibleMsg')}</p>`
     : `<button class="btn-primary" id="detailAddBtn">${t('detailAddBtn')}</button>`;
 
+  // Sin sesión, el detalle tampoco muestra el precio — puede seguir
+  // agregando el producto al pedido, solo que sin verlo (ver accionHtml).
+  const precioDetalleHtml = usuarioActual
+    ? `<p class="detail-price">$${producto.precio.toFixed(2)}</p>
+       <p class="detail-price-unit">${unidadLabelDetalle}</p>`
+    : `<span class="card-price-oculto">${t('precioSoloConCuenta')}</span>`;
+
   const esFavorito = FAVORITOS.has(producto.slug);
   const heartHtml = usuarioActual
     ? `<button type="button" class="detail-heart-btn" id="detailHeartBtn" data-slug="${producto.slug}" aria-label="Favorito">${esFavorito ? '❤️' : '🤍'}</button>`
@@ -1333,8 +1359,7 @@ function abrirDetalleProducto(slug) {
         <h2 class="detail-name">${producto.nombre}</h2>
       </div>
       <div>
-        <p class="detail-price">$${producto.precio.toFixed(2)}</p>
-        <p class="detail-price-unit">${unidadLabelDetalle}</p>
+        ${precioDetalleHtml}
       </div>
     </div>
     ${barcodeHtml}
@@ -1420,6 +1445,8 @@ function renderCartModal() {
     return;
   }
 
+  // Sin sesión se puede armar el carrito igual, solo que sin ver el
+  // precio de cada línea (ni el total) — se muestra hasta iniciar sesión.
   const filas = carrito
     .map(
       (item) => `
@@ -1430,15 +1457,17 @@ function renderCartModal() {
           <span>${item.cantidad}</span>
           <button data-inc="${item.slug}">+</button>
         </div>
-        <span class="cart-row-price">$${(item.precio * item.cantidad).toFixed(2)}</span>
+        <span class="cart-row-price">${usuarioActual ? `$${(item.precio * item.cantidad).toFixed(2)}` : '—'}</span>
         <button class="cart-row-remove" data-remove="${item.slug}">✕</button>
       </div>`
     )
     .join('');
 
-  body.innerHTML = `
-    <h2>${t('cartTitle')}</h2>
-    ${filas}
+  // Con sesión: total + formulario de checkout normal (prellenado con el
+  // perfil). Sin sesión: en vez del formulario, se pide iniciar sesión o
+  // crear cuenta — es el punto donde se "pide login al momento de pagar".
+  const checkoutHtml = usuarioActual
+    ? `
     <div class="cart-total"><span>${t('cartTotal')}</span><strong>$${totalCarrito().toFixed(2)}</strong></div>
     <div id="checkoutFormWrap">
       <input class="form-field" id="inputTienda" placeholder="${t('regTiendaPh')}" value="${perfilActual?.tienda_nombre || ''}" />
@@ -1457,7 +1486,18 @@ function renderCartModal() {
       <p id="checkoutError" class="error-text hidden">${t('checkoutErrorMsg')}</p>
       <button class="btn-primary" id="enviarPedidoBtn">${t('enviarPedidoBtn')}</button>
       <p class="hint-text">${t('checkoutHint')}</p>
-    </div>
+    </div>`
+    : `
+    <div id="checkoutLoginPrompt" class="confirm-state">
+      <p>${t('checkoutRequiereCuentaMsg')}</p>
+      <button class="btn-primary" id="checkoutIrLoginBtn">${t('authTabLogin')}</button>
+      <button class="btn-secondary" id="checkoutIrRegistroBtn">${t('authTabRegistro')}</button>
+    </div>`;
+
+  body.innerHTML = `
+    <h2>${t('cartTitle')}</h2>
+    ${filas}
+    ${checkoutHtml}
   `;
 
   body.querySelectorAll('[data-inc]').forEach((btn) => {
@@ -1477,7 +1517,24 @@ function renderCartModal() {
   body.querySelectorAll('[data-remove]').forEach((btn) => {
     btn.addEventListener('click', (e) => quitarDelCarrito(e.target.dataset.remove));
   });
-  document.getElementById('enviarPedidoBtn').addEventListener('click', enviarPedido);
+
+  if (usuarioActual) {
+    document.getElementById('enviarPedidoBtn').addEventListener('click', enviarPedido);
+  } else {
+    document.getElementById('checkoutIrLoginBtn').addEventListener('click', () => irALoginDesdeCarrito('login'));
+    document.getElementById('checkoutIrRegistroBtn').addEventListener('click', () => irALoginDesdeCarrito('registro'));
+  }
+}
+
+// Desde el carrito, sin sesión, tocar "Iniciar sesión"/"Crear cuenta" lleva
+// a la pantalla de auth (con esa pestaña activa) — al volver o al iniciar
+// sesión, el carrito ya guardado en localStorage sigue ahí (ver
+// cargarCarrito/guardarCarrito), así que no se pierde nada.
+function irALoginDesdeCarrito(tab) {
+  cerrarModal('cartModal');
+  document.getElementById('appShell').classList.add('hidden');
+  document.getElementById('authView').classList.remove('hidden');
+  cambiarTabAuth(tab);
 }
 
 function construirMensajePedido(cliente) {
@@ -1627,6 +1684,7 @@ function aplicarTraduccionesEstaticas() {
 
   document.getElementById('authTabLogin').textContent = t('authTabLogin');
   document.getElementById('authTabRegistro').textContent = t('authTabRegistro');
+  document.getElementById('authBackBtn').textContent = t('adminVolverCatalogo');
   document.getElementById('loginEmail').placeholder = t('loginEmailPh');
   document.getElementById('loginPassword').placeholder = t('loginPasswordPh');
   document.getElementById('loginBtn').textContent = t('loginBtn');
@@ -1650,6 +1708,7 @@ function aplicarTraduccionesEstaticas() {
   document.getElementById('pendienteLogoutBtn').textContent = t('pendienteLogoutBtn');
 
   document.getElementById('cartBtnLabel').textContent = t('cartBtnLabel');
+  document.getElementById('topbarLoginBtn').textContent = t('authTabLogin');
   document.getElementById('profileLinkPedidos').textContent = t('profileLinkPedidos');
   document.getElementById('profileLinkMisPedidos').textContent = t('profileLinkMisPedidos');
   document.getElementById('profileLinkCatalogo').textContent = t('profileLinkCatalogo');
@@ -1691,6 +1750,19 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pendienteRefrescarBtn').addEventListener('click', async () => {
     document.getElementById('pendienteView').classList.add('hidden');
     await cargarPerfilYEntrar();
+  });
+
+  // Invitado que toca "Iniciar sesión" en el topbar — va a la pantalla de
+  // auth (pestaña login) y puede volver al catálogo sin loguearse con
+  // authBackBtn (el catálogo ya está cargado, solo se re-muestra).
+  document.getElementById('topbarLoginBtn').addEventListener('click', () => {
+    document.getElementById('appShell').classList.add('hidden');
+    document.getElementById('authView').classList.remove('hidden');
+    cambiarTabAuth('login');
+  });
+  document.getElementById('authBackBtn').addEventListener('click', () => {
+    document.getElementById('authView').classList.add('hidden');
+    document.getElementById('appShell').classList.remove('hidden');
   });
 
   mostrarSegunSesion();

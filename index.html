@@ -7,13 +7,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=24" />
+<link rel="stylesheet" href="styles.css?v=25" />
 </head>
 <body>
 
-  <!-- Login / Registro (el catálogo requiere cuenta) -->
-  <div id="authView" class="admin-login-screen">
+  <!-- Login / Registro — el catálogo en sí es visible sin cuenta (ver
+       appShell más abajo); esta pantalla solo se abre cuando el visitante
+       toca "Iniciar sesión" o intenta completar un pedido. -->
+  <div id="authView" class="admin-login-screen hidden">
     <div class="login-card auth-card">
+      <button type="button" class="auth-back-link" id="authBackBtn">← Volver al catálogo</button>
       <span class="hero-eyebrow">Catálogo Bimbo</span>
       <div class="auth-tabs">
         <button class="auth-tab active" data-tab="login" id="authTabLogin">Iniciar sesión</button>
@@ -68,7 +71,9 @@
     </div>
   </div>
 
-  <!-- App (catálogo) — visible solo con sesión iniciada y aprobada -->
+  <!-- App (catálogo) — visible para cualquier visitante; sin sesión se
+       puede explorar libremente pero no se ven precios (ver app.js), y
+       hacer un pedido requiere iniciar sesión o crear cuenta. -->
   <div id="appShell" class="hidden">
     <header class="topbar">
       <div class="topbar-inner">
@@ -79,6 +84,7 @@
             <span id="cartBtnLabel">Mi pedido</span>
             <span id="cartBadge" class="cart-badge hidden">0</span>
           </button>
+          <button id="topbarLoginBtn" class="login-btn-topbar hidden">Iniciar sesión</button>
           <div id="profileWrap" class="profile-wrap hidden">
             <button id="profileBtn" class="profile-btn" aria-label="Perfil">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
@@ -161,9 +167,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <!-- JsBarcode (dibuja el UPC como código de barras escaneable) -->
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-  <script src="i18n.js?v=9"></script>
+  <script src="i18n.js?v=10"></script>
   <script src="config.js?v=13"></script>
   <script src="profile-menu.js?v=16"></script>
-  <script src="app.js?v=29"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>
