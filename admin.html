@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css?v=24" />
+<link rel="stylesheet" href="styles.css?v=26" />
 </head>
 <body>
 
@@ -26,6 +26,15 @@
 
   <!-- Panel -->
   <div id="ordersView" class="hidden">
+    <!-- Aviso de salud del sistema — aparece solo si catalogo-bimbo o
+         bimbo-inventory-pro (los dos proyectos de Supabase) no responden,
+         normalmente porque se pausaron por inactividad. Se revisa solo,
+         cada pocos minutos, mientras el panel esté abierto (ver admin.js). -->
+    <div id="systemAlertBanner" class="system-alert-banner hidden" role="alert">
+      <span id="systemAlertText"></span>
+      <button type="button" id="systemAlertRecheckBtn">Revisar de nuevo</button>
+      <button type="button" id="systemAlertCloseBtn" aria-label="Cerrar">✕</button>
+    </div>
     <header class="topbar">
       <div class="topbar-inner">
         <div class="topbar-left">
@@ -317,6 +326,6 @@
   <script src="i18n.js?v=9"></script>
   <script src="config.js?v=13"></script>
   <script src="profile-menu.js?v=16"></script>
-  <script src="admin.js?v=30"></script>
+  <script src="admin.js?v=31"></script>
 </body>
 </html>

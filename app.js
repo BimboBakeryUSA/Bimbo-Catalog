@@ -2,7 +2,7 @@
 // VERSIÓN — súbela cada vez que hagas un cambio, así al abrir la
 // página confirmas de inmediato que sí cargó la versión nueva.
 // ============================================================
-const VERSION = 'v25 — Catálogo visible sin cuenta (precios y pedido requieren login)';
+const VERSION = 'v26 — Catálogo ya no se congela si catalogo-bimbo (login) está caído';
 
 // CONFIG, supabaseClient, productsSupabaseClient y ESTADOS_SERVICIO
 // vienen de config.js (compartido con admin.js)
@@ -33,29 +33,52 @@ let usuarioActual = null;
   }
 })();
 
+// Envuelve una promesa de Supabase con un límite de tiempo. Si el proyecto
+// "catalogo-bimbo" está caído/pausado (ver nota abajo), el SDK de Supabase
+// reintenta solo durante bastantes segundos antes de rendirse — sin este
+// límite, el catálogo se queda en blanco todo ese tiempo. Con el límite,
+// a los pocos segundos se da por vencido y el catálogo se muestra igual,
+// como invitado.
+function conTimeout(promesa, ms) {
+  return Promise.race([promesa, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+}
+
 async function mostrarSegunSesion() {
-  const { data } = await supabaseClient.auth.getSession();
-  if (data.session) {
-    await cargarPerfilYEntrar();
-  } else {
-    // Sin sesión: el catálogo se muestra igual, como invitado — mostrarApp()
-    // ya tolera usuarioActual/perfilActual en null (ver comentario arriba).
-    await mostrarApp();
+  try {
+    const { data } = await conTimeout(supabaseClient.auth.getSession(), 5000);
+    if (data.session) {
+      await cargarPerfilYEntrar();
+      return;
+    }
+  } catch (err) {
+    // Sesión no verificable (sin red, o el proyecto catalogo-bimbo está
+    // caído/pausado) — no debe impedir que se vea el catálogo como invitado.
+    console.error('No se pudo verificar la sesión (¿catalogo-bimbo caído?), se muestra el catálogo como invitado:', err);
   }
+  // Sin sesión (o no se pudo verificar): el catálogo se muestra igual, como
+  // invitado — mostrarApp() ya tolera usuarioActual/perfilActual en null.
+  await mostrarApp();
 }
 
 async function cargarPerfilYEntrar() {
-  const {
-    data: { user },
-  } = await supabaseClient.auth.getUser();
-  usuarioActual = user;
-  const { data: perfil } = await supabaseClient
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .maybeSingle();
-  perfilActual = perfil;
-  actualizarUltimoLogin();
+  try {
+    const {
+      data: { user },
+    } = await conTimeout(supabaseClient.auth.getUser(), 5000);
+    usuarioActual = user;
+    const { data: perfil } = await conTimeout(
+      supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+      5000
+    );
+    perfilActual = perfil;
+    actualizarUltimoLogin();
+  } catch (err) {
+    // Si esto falla a media carga (ej. catalogo-bimbo se cae justo aquí),
+    // se cae de vuelta a modo invitado en vez de dejar la página congelada.
+    console.error('No se pudo cargar el perfil (¿catalogo-bimbo caído?), se muestra el catálogo como invitado:', err);
+    usuarioActual = null;
+    perfilActual = null;
+  }
   await mostrarApp();
 }
 

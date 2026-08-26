@@ -12,6 +12,78 @@ function esAdminPanel() {
   return miPerfilAdmin?.role === 'admin';
 }
 
+// ============================================================
+// SALUD DE SUPABASE — el catálogo usa dos proyectos separados
+// (catalogo-bimbo: login/pedidos/favoritos/estantes, y
+// bimbo-inventory-pro: productos). Si cualquiera de los dos se pausa
+// (ej. por inactividad en el plan gratis) o falla por otra razón, un
+// cliente solo ve la página lenta o rota — Doug no se entera hasta que
+// alguien se queja. Esto lo revisa solo al entrar al panel y cada pocos
+// minutos mientras esté abierto, y muestra un aviso fijo arriba si algo
+// no responde.
+// ============================================================
+const SALUD_CHECK_INTERVALO_MS = 5 * 60 * 1000; // cada 5 minutos
+let saludCheckTimer = null;
+
+function conTimeout(promesa, ms) {
+  return Promise.race([promesa, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+}
+
+// Solo nos importa si el proyecto responde por red (DNS/servidor arriba),
+// no si la consulta específica tiene permiso — por eso cualquier respuesta
+// (incluso un error de RLS) cuenta como "responde", y solo un timeout o un
+// error de red cuenta como "caído".
+async function proyectoResponde(cliente, tabla) {
+  try {
+    await conTimeout(cliente.from(tabla).select('*', { head: true, count: 'exact' }).limit(1), 6000);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+async function verificarSaludSupabase() {
+  const [loginOk, productosOk] = await Promise.all([
+    proyectoResponde(supabaseClient, 'profiles'),
+    proyectoResponde(productsSupabaseClient, 'products'),
+  ]);
+
+  if (loginOk && productosOk) {
+    ocultarAlertaSistema();
+    return;
+  }
+
+  let mensaje;
+  if (!loginOk && !productosOk) {
+    mensaje =
+      '⚠️ Los dos proyectos de Supabase no responden (login/pedidos y productos). Es probable que se hayan pausado por inactividad — revísalos en supabase.com/dashboard.';
+  } else if (!loginOk) {
+    mensaje =
+      '⚠️ El proyecto "catalogo-bimbo" (login, pedidos, favoritos, estantes) no responde — probablemente se pausó por inactividad. Los clientes pueden seguir viendo el catálogo, pero no pueden iniciar sesión ni pedir. Revísalo en supabase.com/dashboard.';
+  } else {
+    mensaje =
+      '⚠️ El proyecto "bimbo-inventory-pro" (productos) no responde — probablemente se pausó por inactividad. El catálogo no puede mostrar productos hasta que se reactive. Revísalo en supabase.com/dashboard.';
+  }
+  mostrarAlertaSistema(mensaje);
+}
+
+function mostrarAlertaSistema(mensaje) {
+  const banner = document.getElementById('systemAlertBanner');
+  if (!banner) return;
+  document.getElementById('systemAlertText').textContent = mensaje;
+  banner.classList.remove('hidden');
+}
+
+function ocultarAlertaSistema() {
+  document.getElementById('systemAlertBanner')?.classList.add('hidden');
+}
+
+function iniciarMonitoreoSalud() {
+  verificarSaludSupabase();
+  clearInterval(saludCheckTimer);
+  saludCheckTimer = setInterval(verificarSaludSupabase, SALUD_CHECK_INTERVALO_MS);
+}
+
 let pedidos = [];
 let filtroEstado = 'todos';
 let busquedaPedidos = '';
@@ -92,6 +164,7 @@ function mostrarPanel() {
     cargarMueblesAdmin();
     cargarSolicitudesMuebleAdmin();
     cargarActividadAdmin();
+    iniciarMonitoreoSalud();
   }
   cargarUsuarios();
   // Las categorías deben estar cargadas ANTES de pintar las tarjetas de
@@ -2024,6 +2097,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('loginPassword').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') iniciarSesion();
   });
+  document.getElementById('systemAlertRecheckBtn').addEventListener('click', verificarSaludSupabase);
+  document.getElementById('systemAlertCloseBtn').addEventListener('click', ocultarAlertaSistema);
   document.getElementById('ordersFilter').querySelectorAll('.chip').forEach((btn) => {
     btn.addEventListener('click', () => {
       filtroEstado = btn.dataset.estado;
