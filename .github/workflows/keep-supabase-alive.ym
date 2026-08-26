@@ -1,0 +1,55 @@
+name: Mantener Supabase despierto
+
+# Los proyectos de Supabase del plan gratis se pausan solos después de ~7
+# días sin actividad de API (eso fue justo lo que le pasó al catálogo el
+# 2026-08-26). Este workflow "toca" los dos proyectos cada 3 días con una
+# consulta de lectura normal, para que Supabase nunca los vea inactivos.
+#
+# No requiere nada instalado ni un servidor propio: corre gratis en los
+# servidores de GitHub. Para activarlo, este archivo solo necesita vivir
+# en el repo en la ruta .github/workflows/keep-supabase-alive.yml (en la
+# rama principal) — GitHub lo detecta y lo agenda solo.
+#
+# Cómo revisar que corrió: pestaña "Actions" del repo en GitHub — cada
+# corrida aparece ahí con ✅ o ❌. Si falla, GitHub le manda un correo al
+# dueño del repo automáticamente, así que esto también avisa si algo anda
+# mal (aparte del aviso que ya se agregó al panel admin).
+#
+# Nota sobre las llaves de abajo: son las mismas "anon key" públicas que ya
+# están en config.js — están hechas para ser públicas (cualquiera que abra
+# el catálogo ya las descarga en el navegador), así que no son secretas y
+# es seguro tenerlas aquí en texto plano.
+
+on:
+  schedule:
+    # Aproximadamente cada 3 días (algunos meses el salto de fin de mes es
+    # de 1 a 4 días — no importa, sigue siendo muchísimo menos que los 7
+    # días que Supabase necesita para pausar un proyecto).
+    - cron: '0 8 */3 * *'
+  # Permite darle "Run workflow" a mano desde la pestaña Actions, para
+  # probarlo sin esperar al siguiente día programado.
+  workflow_dispatch: {}
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping catalogo-bimbo (login, pedidos, favoritos, estantes)
+        run: |
+          HTTP_CODE=$(curl -s -o /tmp/resp1.txt -w "%{http_code}" \
+            "https://zzoyblybwkxbitbvusfc.supabase.co/rest/v1/categorias?select=id&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6b3libHlid2t4Yml0YnZ1c2ZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MDc4MjgsImV4cCI6MjA5OTM4MzgyOH0.5aYA67sT5gHbS6bgvaT5Q1zMuvtAvmb3nwLxLf3U_KU" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6b3libHlid2t4Yml0YnZ1c2ZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MDc4MjgsImV4cCI6MjA5OTM4MzgyOH0.5aYA67sT5gHbS6bgvaT5Q1zMuvtAvmb3nwLxLf3U_KU")
+          echo "catalogo-bimbo respondió HTTP $HTTP_CODE"
+          cat /tmp/resp1.txt
+          if [ "$HTTP_CODE" -ge 400 ]; then echo "::error::catalogo-bimbo devolvió $HTTP_CODE — revísalo en supabase.com/dashboard"; exit 1; fi
+
+      - name: Ping bimbo-inventory-pro (productos)
+        run: |
+          HTTP_CODE=$(curl -s -o /tmp/resp2.txt -w "%{http_code}" \
+            "https://obfikwhukpzelsghowcq.supabase.co/rest/v1/products?select=upc&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iZmlrd2h1a3B6ZWxzZ2hvd2NxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3MjU3NzMsImV4cCI6MjA5OTMwMTc3M30.sKfI_riLcFZA9GyGM6ugW3ELrNb-kLxGNVE53Dv4G70" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iZmlrd2h1a3B6ZWxzZ2hvd2NxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3MjU3NzMsImV4cCI6MjA5OTMwMTc3M30.sKfI_riLcFZA9GyGM6ugW3ELrNb-kLxGNVE53Dv4G70")
+          echo "bimbo-inventory-pro respondió HTTP $HTTP_CODE"
+          cat /tmp/resp2.txt
+          if [ "$HTTP_CODE" -ge 400 ]; then echo "::error::bimbo-inventory-pro devolvió $HTTP_CODE — revísalo en supabase.com/dashboard"; exit 1; fi
