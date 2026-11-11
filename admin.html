@@ -101,9 +101,15 @@
             <button class="chip" data-filtro="aprobado" id="chipUsuariosAprobados">Aprobados</button>
           </div>
         </div>
-        <button class="btn-primary" id="abrirCrearUsuarioBtn" style="margin-bottom:12px;">
-          <span id="btnCrearUsuarioAdminLabel">+ Crear usuario</span>
-        </button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+          <button class="btn-primary" id="abrirCrearUsuarioBtn">
+            <span id="btnCrearUsuarioAdminLabel">+ Crear usuario</span>
+          </button>
+          <!-- Solo admin: copia las cuentas (admin, MSL, ZSL, IBP) al proyecto
+               de inventario para que entren a Mi Territorio / planificador
+               con la misma contraseña. Ver sincronizar_cuentas_inventario. -->
+          <button class="btn-secondary hidden" id="sincronizarInventarioBtn" type="button">⟳ Sincronizar con inventario</button>
+        </div>
         <div class="search-toolbar">
           <input class="form-field" id="usuariosBusqueda" placeholder="Buscar por nombre, teléfono o correo..." />
           <select class="form-field" id="usuariosFiltroEstadoUS">

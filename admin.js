@@ -152,6 +152,7 @@ function mostrarPanel() {
   document.getElementById('tabEstantes').classList.toggle('hidden', !esAdmin);
   document.getElementById('tabActividad').classList.toggle('hidden', !esAdmin);
   document.getElementById('abrirCategoriasBtn').classList.toggle('hidden', !esAdmin);
+  document.getElementById('sincronizarInventarioBtn').classList.toggle('hidden', !esAdmin);
   if (!esAdmin) {
     // MSL/ZSL no tienen pestaña de Pedidos, Estantes ni Actividad —
     // entran directo a Usuarios.
@@ -693,6 +694,28 @@ function generarPasswordAutomatica(nombre) {
 // ponga la contraseña aquí mismo y se la comparta directo.
 // ============================================================
 let nuevoUsuarioPasswordManual = false;
+
+// ============================================================
+// SINCRONIZAR CON INVENTARIO — copia las cuentas de admin, MSL, ZSL e IBP
+// al proyecto de inventario (donde viven Mi Territorio y el planificador)
+// con la misma contraseña. Las altas y cambios de contraseña ya se copian
+// solos; este botón es para forzar que todo quede igual. Solo admin.
+// ============================================================
+async function sincronizarConInventario() {
+  if (!esAdminPanel()) return;
+  if (!window.confirm(t('sincronizarConfirmar'))) return;
+  const btn = document.getElementById('sincronizarInventarioBtn');
+  btn.disabled = true;
+  try {
+    const { data, error } = await supabaseClient.rpc('sincronizar_cuentas_inventario');
+    if (error) throw error;
+    alert(t('sincronizarListo', Number(data) || 0));
+  } catch (err) {
+    alert(t('sincronizarError', err.message || String(err)));
+  } finally {
+    btn.disabled = false;
+  }
+}
 
 function abrirModalCrearUsuario() {
   // Un MSL/ZSL solo puede dar de alta clientes e IBP — crear otro MSL,
@@ -2030,6 +2053,7 @@ function aplicarIdiomaAdminEstatico() {
   setText('chipUsuariosPendientes', 'chipPendientes');
   setText('chipUsuariosAprobados', 'chipAprobados');
   setText('btnCrearUsuarioAdminLabel', 'btnCrearUsuarioAdmin');
+  setText('sincronizarInventarioBtn', 'btnSincronizarInventario');
   setPh('usuariosBusqueda', 'searchPedidosPh');
   setText('usuariosFiltroEstadoUSDefault', 'estadoTodosOpt');
 
@@ -2156,6 +2180,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('abrirCrearUsuarioBtn').addEventListener('click', abrirModalCrearUsuario);
+  document.getElementById('sincronizarInventarioBtn').addEventListener('click', sincronizarConInventario);
   document.getElementById('nuevoUsuarioTipo').addEventListener('change', actualizarCamposCrearUsuario);
   document.getElementById('nuevoUsuarioAcceso').addEventListener('change', actualizarCamposCrearUsuario);
   document.getElementById('nuevoUsuarioNombre').addEventListener('input', actualizarPasswordAutomaticaCrearUsuario);
