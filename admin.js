@@ -707,7 +707,7 @@ async function sincronizarConInventario() {
   const btn = document.getElementById('sincronizarInventarioBtn');
   btn.disabled = true;
   try {
-    const { data, error } = await supabaseClient.rpc('sincronizar_cuentas_inventario');
+    const { data, error } = await supabaseClient.rpc('sincronizar_cuentas_inventario', { p_email: null });
     if (error) throw error;
     alert(t('sincronizarListo', Number(data) || 0));
   } catch (err) {
